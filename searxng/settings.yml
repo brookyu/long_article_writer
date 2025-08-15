@@ -1,0 +1,117 @@
+# SearxNG configuration for Long Article Writer
+# Documentation: https://docs.searxng.org/admin/settings/
+
+general:
+  debug: false
+  instance_name: "Long Article Writer Search"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+brand:
+  new_issue_url: false
+  docs_url: false
+  public_instances: false
+  wiki_url: false
+  issue_url: false
+
+search:
+  safe_search: 0  # 0=off, 1=moderate, 2=strict
+  autocomplete: ""
+  autocomplete_min: 4
+  default_lang: "en"
+  max_ban_time_on_fail: 5
+  ban_time_on_fail: 5
+  suspended_times:
+    SearxEngineAccessDenied: 86400
+    SearxEngineCaptcha: 86400
+    SearxEngineTooManyRequests: 3600
+    cf_SearxEngineCaptcha: 86400
+    cf_SearxEngineAccessDenied: 86400
+    recaptcha_SearxEngineCaptcha: 86400
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "change_this_secret_key_for_production"  # Change in production
+  base_url: false
+  image_proxy: false
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-Download-Options: noopen
+    X-Robots-Tag: noindex, nofollow
+    Referrer-Policy: no-referrer
+
+redis:
+  url: false
+
+ui:
+  static_use_hash: false
+  default_theme: simple
+  default_locale: ""
+  theme_args:
+    simple_style: auto
+  center_alignment: false
+  cache_url: false
+  search_on_category_select: true
+  hotkeys: default
+
+# Enable only reliable engines for article research
+engines:
+  - name: google
+    engine: google
+    shortcut: go
+    use_mobile_ui: false
+    
+  - name: bing
+    engine: bing
+    shortcut: bi
+    
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    base_url: 'https://{language}.wikipedia.org/'
+    
+  - name: wikidata
+    engine: wikidata
+    shortcut: wd
+    timeout: 5.0
+    
+  - name: semantic scholar
+    engine: semantic_scholar
+    shortcut: se
+    disabled: false
+    
+  - name: arxiv
+    engine: arxiv
+    shortcut: arx
+    timeout: 4.0
+    
+  - name: pubmed
+    engine: pubmed
+    shortcut: pub
+    timeout: 3.0
+
+enabled_plugins:
+  - 'Hash plugin'
+  - 'Self Information'
+  - 'Tracker URL remover'
+  - 'Ahmia blacklist'  # blocking .onion sites
+
+disabled_plugins:
+  - 'Open Access DOI rewrite'
+  - 'Tor check plugin'
+
+# Disable unnecessary features for API usage
+preferences:
+  lock:
+    - language
+    - autocomplete
+    - image_proxy
+    - method
+    - safesearch

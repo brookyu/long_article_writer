@@ -1,0 +1,10 @@
+# SearxNG Rate Limiter Configuration
+# More permissive settings for API usage
+
+[botdetection.ip_limit]
+# Disable IP-based rate limiting for API usage
+activate = false
+
+[botdetection.ip_lists]
+# Allow all IPs for API access
+activate = false

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Test - Working Version</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .container { border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
+        select, button { padding: 10px; margin: 10px 0; font-size: 16px; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .testing { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Search Connection Test (Working Version)</h1>
+        
+        <div>
+            <label for="provider">Provider:</label><br>
+            <select id="provider">
+                <option value="duckduckgo">DuckDuckGo (Free)</option>
+                <option value="searxng">SearXNG (Self-hosted)</option>
+                <option value="google">Google Search API</option>
+                <option value="bing">Bing Search API</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="baseUrl">Base URL (leave empty for DuckDuckGo):</label><br>
+            <input type="text" id="baseUrl" placeholder="e.g., http://localhost:8080" style="width: 100%; padding: 10px;">
+        </div>
+
+        <button onclick="testConnection()">🧪 Test Connection</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testConnection() {
+            const provider = document.getElementById('provider').value;
+            const baseUrl = document.getElementById('baseUrl').value;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = '<div class="testing">⏳ Testing connection...</div>';
+            
+            try {
+                const requestBody = { provider: provider };
+                if (baseUrl) {
+                    requestBody.base_url = baseUrl;
+                }
+                
+                const response = await fetch('/api/settings/test-search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ <strong>SUCCESS!</strong><br>
+                            ${data.message}<br>
+                            ${data.note ? `<small>${data.note}</small><br>` : ''}
+                            ${data.recommendation ? `<small><em>${data.recommendation}</em></small>` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ <strong>FAILED</strong><br>
+                            ${data.detail || data.message || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ <strong>ERROR</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        // Auto-test DuckDuckGo on page load
+        window.onload = function() {
+            document.getElementById('provider').value = 'duckduckgo';
+            document.getElementById('baseUrl').value = '';
+        };
+    </script>
+</body>
+</html>
