@@ -24,7 +24,7 @@ export function DocumentList({ collectionId, refreshKey, onDelete }: DocumentLis
       setLoading(true)
       setError(null)
       const response = await documentsApi.list(collectionId)
-      setDocuments(response.documents)
+      setDocuments(response?.documents || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load documents')
     } finally {
@@ -38,6 +38,8 @@ export function DocumentList({ collectionId, refreshKey, onDelete }: DocumentLis
 
   // Poll for processing status updates
   useEffect(() => {
+    if (!documents || documents.length === 0) return
+    
     const pendingDocuments = documents.filter(
       doc => doc.status === DocumentStatus.PENDING || doc.status === DocumentStatus.PROCESSING
     )
@@ -131,7 +133,7 @@ export function DocumentList({ collectionId, refreshKey, onDelete }: DocumentLis
     )
   }
 
-  if (documents.length === 0) {
+  if (!documents || documents.length === 0) {
     return (
       <Card>
         <CardContent>

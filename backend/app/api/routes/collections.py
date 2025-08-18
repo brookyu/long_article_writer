@@ -8,12 +8,12 @@ import time
 import asyncio
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.models.knowledge_base import KBCollection
+from app.models.knowledge_base import KBCollection, KBDocument, Article, ArticleStatus
 from app.schemas.knowledge_base import (
     CollectionCreate,
     CollectionUpdate,
@@ -26,6 +26,7 @@ from app.services.article_generator import ArticleGenerator
 from app.services.ollama_client import OllamaClient
 from app.services.document_processor import DocumentProcessingPipeline
 from app.models.settings import Setting
+from datetime import datetime
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -33,6 +34,21 @@ router = APIRouter()
 # Temporary in-memory storage for generated articles
 # In a real implementation, this would be stored in the database
 generated_articles = {}
+
+
+async def _start_job_processing(job_id: str):
+    """Start processing an upload job in the background"""
+    from app.core.database import get_db
+    
+    # Create a new database session for this background task
+    async for db in get_db():
+        try:
+            from app.services.upload_manager import upload_manager
+            await upload_manager.start_processing_job(job_id, db)
+            break  # Exit the async for loop after processing
+        except Exception as e:
+            logger.error(f"Failed to start job processing for {job_id}: {e}")
+            break
 
 
 async def get_user_llm_model(db: AsyncSession) -> str:
@@ -176,11 +192,22 @@ async def create_collection(
             detail=f"Collection with name '{collection_data.name}' already exists"
         )
     
+    # Get user's configured embedding model if not specified
+    embedding_model = collection_data.embedding_model
+    if not embedding_model:
+        ollama_client = OllamaClient()
+        try:
+            embedding_model = await ollama_client.get_user_embedding_model(db)
+            logger.info(f"Using user's configured embedding model: {embedding_model}")
+        except Exception as e:
+            logger.warning(f"Failed to get user embedding model, using default: {e}")
+            embedding_model = "nomic-embed-text"
+    
     # Create new collection
     new_collection = KBCollection(
         name=collection_data.name,
         description=collection_data.description,
-        embedding_model=collection_data.embedding_model
+        embedding_model=embedding_model
     )
     
     db.add(new_collection)
@@ -208,7 +235,20 @@ async def list_collections(
     count_result = await db.execute(select(func.count(KBCollection.id)))
     total = count_result.scalar()
     
-    collection_responses = [CollectionResponse.model_validate(col) for col in collections]
+    collection_responses = []
+    for col in collections:
+        # Handle None values for total_documents and total_chunks
+        col_dict = {
+            "id": col.id,
+            "name": col.name,
+            "description": col.description,
+            "embedding_model": col.embedding_model,
+            "total_documents": col.total_documents or 0,
+            "total_chunks": col.total_chunks or 0,
+            "created_at": col.created_at,
+            "updated_at": col.updated_at
+        }
+        collection_responses.append(CollectionResponse.model_validate(col_dict))
     
     return CollectionListResponse(
         collections=collection_responses,
@@ -311,7 +351,7 @@ async def get_collection_articles(
     collection_id: int,
     db: AsyncSession = Depends(get_db)
 ) -> List[dict]:
-    """Get all articles for a collection"""
+    """Get all articles for a collection from database"""
     # Verify collection exists
     result = await db.execute(
         select(KBCollection).where(KBCollection.id == collection_id)
@@ -324,26 +364,338 @@ async def get_collection_articles(
             detail=f"Collection with id {collection_id} not found"
         )
     
-    # Return articles from our temporary storage
-    if collection_id not in generated_articles:
-        return []
+    # Get articles from database
+    result = await db.execute(
+        select(Article)
+        .where(Article.collection_id == collection_id)
+        .order_by(Article.created_at.desc())
+    )
+    articles = result.scalars().all()
     
+    # Convert to frontend format
     articles_list = []
-    for article_id, article in generated_articles[collection_id].items():
-        # Return summary info for list view (no simulation needed)
+    for article in articles:
         articles_list.append({
-            "id": article["id"],
-            "title": article["title"],
-            "topic": article["topic"],
-            "status": article["status"],
-            "created_at": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(article["created_at"])),
-            "writing_style": article["writing_style"],
-            "article_type": article["article_type"]
+            "id": article.id,
+            "title": article.title,
+            "topic": article.topic,
+            "status": article.status.value,
+            "word_count": article.word_count or 0,
+            "created_at": article.created_at.isoformat(),
+            "updated_at": article.updated_at.isoformat(),
+            "writing_style": article.writing_style,
+            "article_type": article.article_type,
+            "target_length": article.target_length,
+            "generation_time_seconds": article.generation_time_seconds,
+            "model_used": article.model_used,
+            "content": article.content_markdown,  # Include content for frontend
+            "content_preview": (article.content_markdown or "")[:200] + "..." if article.content_markdown and len(article.content_markdown) > 200 else article.content_markdown or "",
+            "has_outline": bool(article.outline_json),
+            "has_content": bool(article.content_markdown)
         })
     
-    # Sort by creation time (newest first)
-    articles_list.sort(key=lambda x: x["id"], reverse=True)
     return articles_list
+
+
+# Documents endpoints for collections
+@router.get("/{collection_id}/documents", response_model=dict)
+async def get_collection_documents(
+    collection_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Get all documents for a collection from database"""
+    # Verify collection exists
+    result = await db.execute(
+        select(KBCollection).where(KBCollection.id == collection_id)
+    )
+    collection = result.scalar_one_or_none()
+    
+    if not collection:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Collection with id {collection_id} not found"
+        )
+    
+    # Get documents from database - only select core columns that exist
+    result = await db.execute(
+        select(
+            KBDocument.id,
+            KBDocument.collection_id,
+            KBDocument.filename,
+            KBDocument.original_filename,
+            KBDocument.mime_type,
+            KBDocument.size_bytes,
+            KBDocument.file_path,
+            KBDocument.status,
+            KBDocument.chunk_count,
+            KBDocument.created_at,
+            KBDocument.updated_at
+        )
+        .where(KBDocument.collection_id == collection_id)
+        .order_by(KBDocument.created_at.desc())
+    )
+    documents = result.all()
+    
+    # Convert to frontend format
+    documents_list = []
+    for doc in documents:
+        documents_list.append({
+            "id": doc.id,
+            "collection_id": doc.collection_id,
+            "filename": doc.filename,
+            "original_filename": doc.original_filename or doc.filename,
+            "mime_type": doc.mime_type,
+            "size_bytes": doc.size_bytes or 0,
+            "sha256": "",  # Not used in current schema but required by frontend
+            "status": doc.status.value,
+            "error_message": "",  # Not used but may be expected
+            "chunk_count": doc.chunk_count or 0,
+            "created_at": doc.created_at.isoformat(),
+            "updated_at": doc.updated_at.isoformat()
+        })
+    
+    return {
+        "documents": documents_list,
+        "total": len(documents_list)
+    }
+
+
+@router.post("/{collection_id}/documents/", response_model=dict)
+async def upload_document(
+    collection_id: int,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Upload a single document to a collection"""
+    
+    # Verify collection exists
+    result = await db.execute(
+        select(KBCollection).where(KBCollection.id == collection_id)
+    )
+    collection = result.scalar_one_or_none()
+    
+    if not collection:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Collection with id {collection_id} not found"
+        )
+    
+    # For now, use the batch upload system for single files
+    # This ensures consistent processing pipeline
+    try:
+        from app.services.upload_manager import upload_manager
+        import tempfile
+        import shutil
+        from pathlib import Path
+        from datetime import datetime
+        
+        # Save uploaded file temporarily
+        temp_dir = Path(tempfile.gettempdir()) / "single_uploads"
+        temp_dir.mkdir(exist_ok=True)
+        
+        job_temp_dir = temp_dir / f"single_{collection_id}_{int(datetime.now().timestamp())}"
+        job_temp_dir.mkdir()
+        
+        file_path = job_temp_dir / file.filename
+        
+        try:
+            # Save uploaded file
+            with open(file_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+            
+            # Create upload job for single file using multiple_files type
+            job_result = await upload_manager.create_upload_job(
+                collection_id=collection_id,
+                upload_type="multiple_files",
+                file_paths=[str(file_path)],
+                preserve_structure=False,
+                skip_unsupported=True,
+                max_file_size_mb=500,
+                db=db
+            )
+            
+            # Start processing in background
+            job_id = job_result["job_id"]
+            
+            # Add background task to start processing
+            background_tasks.add_task(
+                _start_job_processing,
+                job_id
+            )
+            
+            # For now, return the job info and let frontend track progress
+            return {
+                "id": None,  # Will be set after processing
+                "collection_id": collection_id,
+                "filename": file.filename,
+                "original_filename": file.filename,
+                "mime_type": file.content_type,
+                "size_bytes": 0,  # Will be calculated during processing
+                "sha256": "",
+                "status": "pending",
+                "error_message": "",
+                "chunk_count": 0,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+                "job_id": job_id,
+                "message": "File upload accepted. Processing started."
+            }
+            
+        except Exception as e:
+            # Cleanup temp files on error
+            if job_temp_dir.exists():
+                shutil.rmtree(job_temp_dir)
+            raise e
+            
+    except Exception as e:
+        logger.error(f"Single file upload failed: {e}")
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail=f"File upload failed: {str(e)}"
+        )
+
+
+@router.get("/{collection_id}/documents/{document_id}", response_model=dict)
+async def get_document(
+    collection_id: int,
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Get a specific document by ID"""
+    
+    # Verify collection exists
+    result = await db.execute(
+        select(KBCollection).where(KBCollection.id == collection_id)
+    )
+    collection = result.scalar_one_or_none()
+    
+    if not collection:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Collection with id {collection_id} not found"
+        )
+    
+    # Get the specific document
+    result = await db.execute(
+        select(
+            KBDocument.id,
+            KBDocument.collection_id,
+            KBDocument.filename,
+            KBDocument.original_filename,
+            KBDocument.mime_type,
+            KBDocument.size_bytes,
+            KBDocument.file_path,
+            KBDocument.status,
+            KBDocument.chunk_count,
+            KBDocument.created_at,
+            KBDocument.updated_at
+        ).where(
+            KBDocument.collection_id == collection_id,
+            KBDocument.id == document_id
+        )
+    )
+    document = result.first()
+    
+    if not document:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Document with id {document_id} not found in collection {collection_id}"
+        )
+    
+    return {
+        "id": document.id,
+        "collection_id": document.collection_id,
+        "filename": document.filename,
+        "original_filename": document.original_filename or document.filename,
+        "mime_type": document.mime_type,
+        "size_bytes": document.size_bytes or 0,
+        "sha256": "",  # Not used in current schema but may be expected
+        "status": document.status.value,
+        "error_message": "",  # Not used but may be expected
+        "chunk_count": document.chunk_count or 0,
+        "created_at": document.created_at.isoformat(),
+        "updated_at": document.updated_at.isoformat()
+    }
+
+
+@router.delete("/{collection_id}/documents/{document_id}", status_code=HTTPStatus.NO_CONTENT)
+async def delete_document(
+    collection_id: int,
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> None:
+    """Delete a specific document"""
+    
+    # Verify collection exists
+    result = await db.execute(
+        select(KBCollection).where(KBCollection.id == collection_id)
+    )
+    collection = result.scalar_one_or_none()
+    
+    if not collection:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Collection with id {collection_id} not found"
+        )
+    
+    # Get the document to delete
+    result = await db.execute(
+        select(KBDocument).where(
+            KBDocument.collection_id == collection_id,
+            KBDocument.id == document_id
+        )
+    )
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Document with id {document_id} not found in collection {collection_id}"
+        )
+    
+    # Delete the document
+    await db.delete(document)
+    await db.commit()
+    
+    logger.info(f"Document {document_id} deleted from collection {collection_id}")
+
+
+@router.get("/{collection_id}/documents/{document_id}/status", response_model=dict)
+async def get_document_processing_status(
+    collection_id: int,
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Get processing status for a specific document"""
+    
+    # Get the document 
+    result = await db.execute(
+        select(
+            KBDocument.id,
+            KBDocument.status,
+            KBDocument.chunk_count,
+            KBDocument.updated_at
+        ).where(
+            KBDocument.collection_id == collection_id,
+            KBDocument.id == document_id
+        )
+    )
+    document = result.first()
+    
+    if not document:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Document with id {document_id} not found"
+        )
+    
+    return {
+        "document_id": document.id,
+        "status": document.status.value,
+        "chunk_count": document.chunk_count or 0,
+        "last_updated": document.updated_at.isoformat(),
+        "progress": 100 if document.status.value == "completed" else 0
+    }
 
 
 @router.post("/{collection_id}/generate-article")
@@ -407,7 +759,7 @@ async def get_article(
     article_id: int,
     db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """Get a specific article"""
+    """Get a specific article from database"""
     # Verify collection exists
     result = await db.execute(
         select(KBCollection).where(KBCollection.id == collection_id)
@@ -420,16 +772,35 @@ async def get_article(
             detail=f"Collection with id {collection_id} not found"
         )
     
-    # Check if article exists in our temporary storage
-    if collection_id not in generated_articles or article_id not in generated_articles[collection_id]:
+    # Get article from database
+    result = await db.execute(
+        select(Article)
+        .where(Article.id == article_id, Article.collection_id == collection_id)
+    )
+    article = result.scalar_one_or_none()
+    
+    if not article:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND,
             detail=f"Article with id {article_id} not found in collection {collection_id}"
         )
     
-    article = generated_articles[collection_id][article_id]
-    
-    # Article content is now generated by the real LLM process
-    # No need for simulation - just return the current state
-    
-    return article
+    # Return full article data
+    return {
+        "id": article.id,
+        "title": article.title,
+        "topic": article.topic,
+        "status": article.status.value,
+        "content": article.content_markdown,
+        "word_count": article.word_count or 0,
+        "created_at": article.created_at.isoformat(),
+        "updated_at": article.updated_at.isoformat(),
+        "writing_style": article.writing_style,
+        "article_type": article.article_type,
+        "target_length": article.target_length,
+        "generation_time_seconds": article.generation_time_seconds,
+        "model_used": article.model_used,
+        "outline_json": article.outline_json,
+        "has_outline": bool(article.outline_json),
+        "has_content": bool(article.content_markdown)
+    }

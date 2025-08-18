@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="sqlite:///./long_article_writer.db",
-        description="Database URL (SQLite for development, MySQL for production)"
+        default="mysql://root:@localhost:3307/long_article_writer",
+        description="Database URL (MySQL for development and production)"
     )
     
     # Milvus Vector Database

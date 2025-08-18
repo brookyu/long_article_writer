@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ interface ArticleListProps {
 }
 
 export function ArticleList({ collectionId, refreshTrigger }: ArticleListProps) {
+  const { t } = useTranslation()
   const [articles, setArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
@@ -54,25 +56,25 @@ export function ArticleList({ collectionId, refreshTrigger }: ArticleListProps) 
   const getStatusBadge = (status: Article['status']) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-500">✅ Completed</Badge>
+        return <Badge variant="default" className="bg-green-500">✅ {t('articles.status.completed')}</Badge>
       case 'generating':
-        return <Badge variant="secondary" className="bg-blue-500 text-white">⏳ Generating</Badge>
+        return <Badge variant="secondary" className="bg-blue-500 text-white">⏳ {t('articles.status.generating')}</Badge>
       case 'failed':
-        return <Badge variant="destructive">❌ Failed</Badge>
+        return <Badge variant="destructive">❌ {t('articles.status.failed', 'Failed')}</Badge>
       default:
-        return <Badge variant="outline">⏸️ Pending</Badge>
+        return <Badge variant="outline">⏸️ {t('articles.status.pending')}</Badge>
     }
   }
 
   const formatGenerationTime = (seconds?: number) => {
-    if (!seconds) return 'N/A'
+    if (!seconds) return t('articles.status.notAvailable', 'N/A')
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = Math.floor(seconds % 60)
     return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`
   }
 
   const deleteArticle = async (articleId: number) => {
-    if (!confirm('Are you sure you want to delete this article?')) return
+    if (!confirm(t('articles.deleteConfirm', 'Are you sure you want to delete this article?'))) return
     
     try {
       await articlesApi.delete(collectionId, articleId)
@@ -88,7 +90,7 @@ export function ArticleList({ collectionId, refreshTrigger }: ArticleListProps) 
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2" />
-            Loading articles...
+            {t('common.loading')}
           </div>
         </CardContent>
       </Card>
@@ -100,8 +102,8 @@ export function ArticleList({ collectionId, refreshTrigger }: ArticleListProps) 
       <Card>
         <CardContent className="p-6 text-center">
           <div className="text-gray-500">
-            <h3 className="text-lg font-medium mb-2">No Articles Yet</h3>
-            <p>Generate your first AI article with enhanced citations!</p>
+            <h3 className="text-lg font-medium mb-2">{t('articles.noArticles')}</h3>
+            <p>{t('articles.noArticlesDescription', 'Generate your first AI article with enhanced citations!')}</p>
           </div>
         </CardContent>
       </Card>
@@ -132,15 +134,15 @@ export function ArticleList({ collectionId, refreshTrigger }: ArticleListProps) 
               <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                 <div className="flex items-center gap-4">
                   {article.word_count && (
-                    <span>📄 {article.word_count} words</span>
+                    <span>📄 {t('articles.wordCount', { count: article.word_count })}</span>
                   )}
                   {article.references && article.references.length > 0 ? (
                     <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md">
-                      📚 {article.references.length} citations
+                      📚 {t('articles.citationCount', { count: article.references.length })}
                     </span>
                   ) : article.status === 'completed' ? (
                     <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-md">
-                      ⚠️ No citations
+                      ⚠️ {t('articles.noCitations')}
                     </span>
                   ) : null}
                   <span>⏱️ {formatGenerationTime(article.generation_time_seconds)}</span>
@@ -157,15 +159,15 @@ export function ArticleList({ collectionId, refreshTrigger }: ArticleListProps) 
                   onClick={() => handleViewArticle(article)}
                   disabled={article.status !== 'completed' || loadingArticle}
                 >
-                  {loadingArticle ? '⏳ Loading...' : 
-                   article.status === 'completed' ? '👁️ View Article' : '⏳ Generating...'}
+                  {loadingArticle ? `⏳ ${t('common.loading')}` : 
+                   article.status === 'completed' ? `👁️ ${t('articles.viewButton')}` : `⏳ ${t('articles.status.generating')}`}
                 </Button>
                 <Button 
                   variant="destructive" 
                   size="sm"
                   onClick={() => deleteArticle(article.id)}
                 >
-                  🗑️ Delete
+                  🗑️ {t('articles.deleteButton')}
                 </Button>
               </div>
             </CardContent>

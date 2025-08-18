@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Server, Brain, Globe, Save, TestTube } from 'lucide-react'
+import { Settings, Server, Brain, Globe, Save, TestTube, Palette } from 'lucide-react'
+import { settingsApi } from '@/lib/api'
 
 interface SettingsFormProps {
   onSave?: () => void
@@ -33,8 +35,14 @@ interface SearchSettings {
   enabled: boolean
 }
 
+interface UISettings {
+  language: 'en' | 'zh'
+  theme: 'light' | 'dark'
+}
+
 export function SettingsForm({ onSave }: SettingsFormProps) {
-  const [activeTab, setActiveTab] = useState<'llm' | 'embedding' | 'search'>('llm')
+  const { t } = useTranslation()
+  const [activeTab, setActiveTab] = useState<'llm' | 'embedding' | 'search' | 'ui'>('llm')
   const [llmSettings, setLlmSettings] = useState<LLMSettings>({
     provider: 'ollama',
     model: 'mixtral:latest',
@@ -42,6 +50,8 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
     temperature: 0.7,
     maxTokens: 2000
   })
+  const [ollamaModels, setOllamaModels] = useState<Array<{name: string, size: number, parameter_size: string, family: string}>>([])
+  const [loadingModels, setLoadingModels] = useState(false)
 
   const [embeddingSettings, setEmbeddingSettings] = useState<EmbeddingSettings>({
     provider: 'ollama',
@@ -55,8 +65,35 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
     enabled: true
   })
 
+  const [uiSettings, setUiSettings] = useState<UISettings>({
+    language: 'en',
+    theme: 'light'
+  })
+
   const [isLoading, setIsLoading] = useState(false)
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'testing'>>({})
+
+  // Load Ollama models
+  const loadOllamaModels = async () => {
+    if (loadingModels) return
+    setLoadingModels(true)
+    try {
+      const response = await settingsApi.listOllamaModels()
+      if (response.status === 'success') {
+        setOllamaModels(response.models)
+      }
+    } catch (error) {
+      console.error('Failed to load Ollama models:', error)
+      // Set fallback models if API fails
+      setOllamaModels([
+        { name: 'gpt-oss:20b', size: 0, parameter_size: '20.9B', family: 'gptoss' },
+        { name: 'nomic-embed-text:latest', size: 0, parameter_size: '137M', family: 'nomic-bert' },
+        { name: 'mixtral:latest', size: 0, parameter_size: '46.7B', family: 'llama' }
+      ])
+    } finally {
+      setLoadingModels(false)
+    }
+  }
 
   // Load settings from backend on component mount
   useEffect(() => {
@@ -89,6 +126,11 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
             enabled: data.search_settings.enabled !== false,
             ...(data.search_settings.apiKey && { apiKey: data.search_settings.apiKey })
           })
+
+          setUiSettings({
+            language: data.ui_settings?.language || 'en',
+            theme: data.ui_settings?.theme || 'light'
+          })
         }
       } catch (error) {
         console.error('Failed to load settings:', error)
@@ -102,6 +144,7 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
     }
     
     loadSettings()
+    loadOllamaModels()  // Load available Ollama models
   }, [])
 
   const handleSave = async () => {
@@ -115,7 +158,8 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
         body: JSON.stringify({
           llm_settings: llmSettings,
           embedding_settings: embeddingSettings,
-          search_settings: searchSettings
+          search_settings: searchSettings,
+          ui_settings: uiSettings
         })
       })
       
@@ -236,7 +280,16 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
             className="flex items-center gap-2"
           >
             <Globe className="w-4 h-4" />
-            Web Search
+            {t('settings.tabs.search')}
+          </Button>
+          <Button
+            variant={activeTab === 'ui' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('ui')}
+            className="flex items-center gap-2"
+          >
+            <Palette className="w-4 h-4" />
+            {t('settings.tabs.ui')}
           </Button>
         </div>
 
@@ -291,20 +344,40 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
               </div>
 
               <div>
-                <Label>Model</Label>
+                <Label className="flex items-center justify-between">
+                  Model
+                  {llmSettings.provider === 'ollama' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={loadOllamaModels}
+                      disabled={loadingModels}
+                      className="ml-2 h-6 text-xs"
+                    >
+                      {loadingModels ? 'Loading...' : 'Refresh'}
+                    </Button>
+                  )}
+                </Label>
                 <select
                   value={llmSettings.model}
                   onChange={(e) => setLlmSettings(prev => ({ ...prev, model: e.target.value }))}
                   className="w-full mt-1 px-3 py-2 border rounded-md"
+                  disabled={llmSettings.provider === 'ollama' && loadingModels}
                 >
                   {llmSettings.provider === 'ollama' && (
                     <>
-                      <option value="mixtral:latest">mixtral:latest</option>
-                      <option value="llama3.1:8b">llama3.1:8b</option>
-                      <option value="llama3.1:70b">llama3.1:70b</option>
-                      <option value="gpt-oss:20b">gpt-oss:20b</option>
-                      <option value="codellama:latest">codellama:latest</option>
-                      <option value="mistral:latest">mistral:latest</option>
+                      {loadingModels ? (
+                        <option value="">Loading models...</option>
+                      ) : ollamaModels.length > 0 ? (
+                        ollamaModels.map((model) => (
+                          <option key={model.name} value={model.name}>
+                            {model.name} ({model.parameter_size})
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">No models available</option>
+                      )}
                     </>
                   )}
                   {llmSettings.provider === 'openai' && (
@@ -423,18 +496,42 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
               </div>
 
               <div>
-                <Label>Model</Label>
+                <Label className="flex items-center justify-between">
+                  Model
+                  {embeddingSettings.provider === 'ollama' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={loadOllamaModels}
+                      disabled={loadingModels}
+                      className="ml-2 h-6 text-xs"
+                    >
+                      {loadingModels ? 'Loading...' : 'Refresh'}
+                    </Button>
+                  )}
+                </Label>
                 <select
                   value={embeddingSettings.model}
                   onChange={(e) => setEmbeddingSettings(prev => ({ ...prev, model: e.target.value }))}
                   className="w-full mt-1 px-3 py-2 border rounded-md"
+                  disabled={embeddingSettings.provider === 'ollama' && loadingModels}
                 >
                   {embeddingSettings.provider === 'ollama' && (
                     <>
-                      <option value="nomic-embed-text">nomic-embed-text</option>
-                      <option value="mxbai-embed-large">mxbai-embed-large</option>
-                      <option value="all-minilm">all-minilm</option>
-                      <option value="snowflake-arctic-embed">snowflake-arctic-embed</option>
+                      {loadingModels ? (
+                        <option value="">Loading models...</option>
+                      ) : ollamaModels.length > 0 ? (
+                        ollamaModels
+                          .filter(model => model.family === 'nomic-bert' || model.name.includes('embed'))
+                          .map((model) => (
+                            <option key={model.name} value={model.name}>
+                              {model.name} ({model.parameter_size})
+                            </option>
+                          ))
+                      ) : (
+                        <option value="">No embedding models available</option>
+                      )}
                     </>
                   )}
                   {embeddingSettings.provider === 'openai' && (
@@ -544,6 +641,44 @@ export function SettingsForm({ onSave }: SettingsFormProps) {
                   />
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'ui' && (
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>{t('settings.ui.title')}</CardTitle>
+                <CardDescription>
+                  {t('settings.ui.description')}
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>{t('settings.ui.language')}</Label>
+                <select
+                  value={uiSettings.language}
+                  onChange={(e) => setUiSettings(prev => ({ ...prev, language: e.target.value as 'en' | 'zh' }))}
+                  className="w-full mt-1 px-3 py-2 border rounded-md"
+                >
+                  <option value="en">English</option>
+                  <option value="zh">中文 (Chinese)</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>{t('settings.ui.theme')}</Label>
+                <select
+                  value={uiSettings.theme}
+                  onChange={(e) => setUiSettings(prev => ({ ...prev, theme: e.target.value as 'light' | 'dark' }))}
+                  className="w-full mt-1 px-3 py-2 border rounded-md"
+                >
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
             </CardContent>
           </Card>
         )}

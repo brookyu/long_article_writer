@@ -1,0 +1,2 @@
+data: {"type": "status", "message": "Starting research...", "step": 1, "total_steps": 3}
+

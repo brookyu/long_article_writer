@@ -1,0 +1,27 @@
+{
+  "company": {
+    "name": "Tech Innovations Inc",
+    "founded": 2020,
+    "employees": [
+      {
+        "id": 1,
+        "name": "John Doe",
+        "position": "Software Engineer",
+        "skills": ["Python", "JavaScript", "Docker"]
+      },
+      {
+        "id": 2,
+        "name": "Jane Smith",
+        "position": "Product Manager",
+        "skills": ["Agile", "Analytics", "Leadership"]
+      }
+    ],
+    "projects": [
+      {
+        "name": "AI Document Processor",
+        "status": "active",
+        "technologies": ["Python", "FastAPI", "Ollama"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSE Test</title>
+</head>
+<body>
+    <h1>Server-Sent Events Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+
+    <script>
+        const jobId = 'upload_1755318724_9f9012d0';
+        const collectionId = 4;
+        const url = `/api/kb/collections/${collectionId}/upload-jobs/${jobId}/stream/`;
+        
+        console.log('Connecting to:', url);
+        document.getElementById('status').textContent = `Connecting to ${url}`;
+        
+        const eventSource = new EventSource(url);
+        
+        eventSource.onopen = function(event) {
+            console.log('SSE connection opened', event);
+            document.getElementById('status').textContent = 'Connected!';
+        };
+        
+        eventSource.onmessage = function(event) {
+            console.log('SSE message received:', event.data);
+            const data = JSON.parse(event.data);
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<p><strong>${new Date().toLocaleTimeString()}</strong>: ${JSON.stringify(data, null, 2)}</p>`;
+        };
+        
+        eventSource.onerror = function(event) {
+            console.error('SSE error:', event);
+            document.getElementById('status').textContent = 'Error occurred!';
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "project": {
+    "name": "AI Document Processing System",
+    "version": "1.0.0",
+    "description": "A comprehensive system for processing and analyzing documents using AI",
+    "technologies": [
+      "Python",
+      "FastAPI",
+      "React",
+      "TypeScript",
+      "Machine Learning"
+    ],
+    "features": {
+      "document_processing": true,
+      "multi_format_support": true,
+      "folder_upload": true,
+      "batch_processing": true,
+      "ai_analysis": true
+    },
+    "settings": {
+      "max_file_size_mb": 10,
+      "supported_formats": [
+        "pdf", "docx", "txt", "md", "html", "csv", "json", "rtf"
+      ],
+      "batch_size": 5,
+      "timeout_seconds": 300
+    }
+  }
+}

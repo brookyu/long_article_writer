@@ -1,0 +1,242 @@
+{
+  "navigation": {
+    "home": "Home",
+    "collections": "Collections",
+    "articles": "🤖 AI Articles",
+    "settings": "Settings",
+    "appTitle": "Long Article Writer"
+  },
+  "home": {
+    "title": "🤖 Long Article Writer",
+    "subtitle": "AI-powered article generation with enhanced citations and multi-language web search",
+    "features": {
+      "generation": "⚡ 2-minute generation",
+      "citations": "📚 Automatic citations",
+      "multilang": "🌐 Multi-language search",
+      "references": "🔗 Reference links"
+    },
+    "knowledgeBase": {
+      "title": "Knowledge Base",
+      "description": "Organize your documents into collections for AI-powered research and writing.",
+      "button": "Manage Collections"
+    },
+    "aiGeneration": {
+      "title": "🤖 AI Article Generation",
+      "description": "Generate professional articles with enhanced citations in under 2 minutes.",
+      "button": "🚀 Generate Articles"
+    },
+    "gettingStarted": {
+      "title": "Getting Started",
+      "step1": "Create your first collection to organize documents by topic or project",
+      "step2": "Upload documents (PDFs, text files) to build your knowledge base",
+      "step3": "Generate AI-powered articles with enhanced citations in under 2 minutes"
+    }
+  },
+  "chat": {
+    "title": "AI Article Writer",
+    "subtitle": "Collection: {{collectionId}}",
+    "clearButton": "Clear",
+    "topicLabel": "Article Topic",
+    "topicPlaceholder": "Enter the main topic for your article...",
+    "subtopicsLabel": "Subtopics (Optional)",
+    "subtopicsPlaceholder": "Add subtopic...",
+    "addButton": "Add",
+    "articleTypeLabel": "Article Type",
+    "lengthLabel": "Length",
+    "writingStyleLabel": "Writing Style",
+    "generateOutlineButton": "Generate Outline",
+    "generateFullArticleButton": "Generate Full Article",
+    "articleTypes": {
+      "comprehensive": "Comprehensive",
+      "tutorial": "Tutorial",
+      "analysis": "Analysis",
+      "overview": "Overview",
+      "technical": "Technical"
+    },
+    "lengths": {
+      "short": "Short (500-1000 words)",
+      "medium": "Medium (1000-2500 words)",
+      "long": "Long (2500+ words)"
+    },
+    "writingStyles": {
+      "professional": "Professional",
+      "conversational": "Conversational",
+      "academic": "Academic",
+      "technical": "Technical",
+      "casual": "Casual"
+    },
+    "processing": "Processing...",
+    "processingStep": "Processing step {{currentStep}}/{{totalSteps}}...",
+    "stepLabel": "Step {{step}}/{{totalSteps}}",
+    "features": {
+      "realtime": "Real-time generation",
+      "interactive": "Interactive chat",
+      "citations": "Smart citations",
+      "refinementSoon": "Outline refinement feature will be implemented soon!",
+      "regenerationSoon": "Outline regeneration feature will be implemented soon!"
+    },
+    "messages": {
+      "researchComplete": "Research complete: Found {{chunks}} relevant chunks from {{documents}} documents",
+      "outlineGenerated": "Generated outline for \"{{topic}}\""
+    },
+    "errors": {
+      "generateFailed": "Failed to generate article: {{error}}",
+      "unknown": "Unknown error"
+    },
+    "articleGeneration": "Article Generation",
+    "feedbackPlaceholder": "Share your feedback, refinements, or questions about the current step...",
+    "startGeneration": "Start Generation",
+    "sendFeedback": "Send Feedback",
+    "generating": "Generating...",
+    "generatingContent": "Generating content...",
+    "quickActions": "Quick Actions",
+    "currentContext": "Current Context",
+    "topic": "Topic",
+    "collection": "Collection",
+    "status": "Status",
+    "step": {
+      "topic": "Topic Selection",
+      "research": "Researching",
+      "outline": "Outlining", 
+      "content": "Writing Content",
+      "complete": "Complete"
+    },
+    "suggestions": {
+      "makeMoreDetailed": "Make more detailed",
+      "addMoreSources": "Add more sources",
+      "changeTone": "Change tone",
+      "focusOnRecent": "Focus on recent sources",
+      "expandScope": "Expand research scope",
+      "addSpecificTerms": "Add specific search terms",
+      "reorderSections": "Reorder sections",
+      "addMoreSections": "Add more sections",
+      "expandExamples": "Expand with examples"
+    },
+    "searchingKnowledge": "Searching knowledge base...",
+    "creatingOutline": "Creating article outline...",
+    "outlineComplete": "Outline complete! You can now provide feedback or approve to continue.",
+    "generationComplete": "Article generation complete!",
+    "processingMessage": "Processing your request...",
+    "researchComplete": "Research complete: Found {{chunks}} relevant chunks from {{documents}} documents",
+    "researchCompleteWeb": "Research complete: Found {{chunks}} web search results (local knowledge base unavailable)",
+    "outlineGenerated": "Generated outline for \"{{topic}}\"",
+    "errorMessage": "Error: {{error}}",
+    "export": "Export",
+    "reset": "Reset"
+  },
+  "articles": {
+    "generatedTitle": "Generated Articles",
+    "collectionLabel": "Collection {{collectionId}}",
+    "subtitle": "Your AI-generated articles with citations",
+    "status": {
+      "pending": "Pending",
+      "outlining": "Outlining",
+      "drafting": "Drafting", 
+      "completed": "Completed",
+      "generating": "Generating...",
+      "failed": "Failed",
+      "notAvailable": "N/A"
+    },
+    "noArticles": "No Articles Yet",
+    "noArticlesDescription": "Generate your first AI article with enhanced citations!",
+    "deleteButton": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this article?",
+    "viewButton": "View Article",
+    "wordCount": "{{count}} words",
+    "citationCount": "{{count}} citations",
+    "noCitations": "No citations"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Configure AI providers and services",
+    "backButton": "Back to Home",
+    "saveButton": "Save Settings",
+    "savingButton": "Saving...",
+    "saveSuccess": "✓ Settings saved successfully",
+    "testButton": "Test",
+    "tabs": {
+      "llm": "LLM Provider",
+      "embedding": "Embeddings",
+      "search": "Web Search",
+      "ui": "Interface"
+    },
+    "llm": {
+      "title": "LLM Configuration",
+      "description": "Configure your language model for article generation",
+      "provider": "Provider",
+      "model": "Model",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Enter your API key",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "e.g., http://localhost:11434",
+      "temperature": "Temperature",
+      "maxTokens": "Max Tokens"
+    },
+    "embedding": {
+      "title": "Embedding Configuration",
+      "description": "Configure embeddings for knowledge base search"
+    },
+    "search": {
+      "title": "Web Search Configuration",
+      "description": "Configure web search for supplementary research",
+      "enableLabel": "Enable web search fallback"
+    },
+    "ui": {
+      "title": "Interface Settings",
+      "description": "Customize your user interface preferences",
+      "language": "Language",
+      "theme": "Theme"
+    },
+    "status": {
+      "testing": "Testing...",
+      "connected": "Connected",
+      "failed": "Failed",
+      "notTested": "Not tested"
+    }
+  },
+  "collections": {
+    "title": "Knowledge Base Collections",
+    "subtitle": "Manage your document collections and knowledge bases",
+    "createButton": "Create Collection",
+    "chatButton": "Chat",
+    "articlesButton": "Articles",
+    "detailsButton": "Details",
+    "noCollections": "No Collections Found",
+    "noCollectionsDescription": "Create your first knowledge base collection to get started",
+    "noDescription": "No description",
+    "table": {
+      "name": "Name",
+      "description": "Description", 
+      "documents": "Documents",
+      "chunks": "Chunks",
+      "model": "Model",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "deleteFailed": "Failed to delete collection: {{error}}"
+  },
+  "outline": {
+    "title": "Article Outline:",
+    "approveButton": "✓ Approve & Generate Article",
+    "refineButton": "✏️ Refine Outline", 
+    "regenerateButton": "🔄 Regenerate",
+    "feedbackButton": "💬 Add Feedback",
+    "feedbackLabel": "Your feedback:",
+    "feedbackPlaceholder": "What changes would you like to make to this outline?",
+    "submitFeedbackButton": "Submit Feedback"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update",
+    "search": "Search",
+    "close": "Close"
+  }
+}

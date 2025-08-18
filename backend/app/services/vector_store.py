@@ -31,7 +31,7 @@ class MilvusVectorStore:
         self.host = settings.MILVUS_HOST
         self.port = settings.MILVUS_PORT
         self.connection_name = "default"
-        self.dimension = 768  # nomic-embed-text dimension
+        self.dimension = 4096  # Qwen3-Embedding-8B dimension
         self._connected = False
     
     async def connect(self) -> None:

@@ -13,7 +13,7 @@ class CollectionCreate(BaseModel):
     """Schema for creating a new collection"""
     name: str = Field(..., min_length=1, max_length=255, description="Collection name")
     description: Optional[str] = Field(None, description="Collection description")
-    embedding_model: Optional[str] = Field(default="nomic-embed-text", description="Embedding model to use")
+    embedding_model: Optional[str] = Field(default=None, description="Embedding model to use (uses settings if not specified)")
 
 
 class CollectionUpdate(BaseModel):

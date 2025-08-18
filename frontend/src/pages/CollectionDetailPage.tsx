@@ -4,8 +4,12 @@ import { ArrowLeft, Database, Plus, PenTool } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DocumentUpload } from '@/components/documents/DocumentUpload'
+import { FolderUpload } from '@/components/documents/FolderUpload'
+import { EnhancedFolderUpload } from '@/components/documents/EnhancedFolderUpload'
 import { DocumentList } from '@/components/documents/DocumentList'
 import { DocumentSearch } from '@/components/documents/DocumentSearch'
+import { FolderTree } from '@/components/folders/FolderTree'
+import { FolderBrowser } from '@/components/folders/FolderBrowser'
 import { collectionsApi } from '@/lib/api'
 import { Collection } from '@/types/collections'
 import { Document } from '@/types/documents'
@@ -19,6 +23,8 @@ export function CollectionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showUpload, setShowUpload] = useState(false)
+  const [uploadMode, setUploadMode] = useState<'individual' | 'folder' | 'enhanced'>('enhanced')
+  const [viewMode, setViewMode] = useState<'documents' | 'folders' | 'browser'>('documents')
   const [refreshKey, setRefreshKey] = useState(0)
 
   const loadCollection = async () => {
@@ -159,30 +165,125 @@ export function CollectionDetailPage() {
       {showUpload && (
         <Card>
           <CardHeader>
-            <CardTitle>Upload Documents</CardTitle>
-            <CardDescription>
-              Add documents to this collection for AI-powered analysis
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Upload Documents</CardTitle>
+                <CardDescription>
+                  Add documents to this collection for AI-powered analysis
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={uploadMode === 'enhanced' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setUploadMode('enhanced')}
+                >
+                  Enhanced Upload
+                </Button>
+                <Button
+                  variant={uploadMode === 'folder' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setUploadMode('folder')}
+                >
+                  Simple Folder
+                </Button>
+                <Button
+                  variant={uploadMode === 'individual' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setUploadMode('individual')}
+                >
+                  Individual Files
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <DocumentUpload
-              collectionId={collectionId}
-              onUploadComplete={handleUploadComplete}
-              onUploadError={handleUploadError}
-            />
+            {uploadMode === 'enhanced' ? (
+              <EnhancedFolderUpload
+                collectionId={collectionId}
+                onUploadComplete={handleUploadComplete}
+                onUploadError={handleUploadError}
+              />
+            ) : uploadMode === 'folder' ? (
+              <FolderUpload
+                collectionId={collectionId}
+                onUploadComplete={handleUploadComplete}
+                onUploadError={handleUploadError}
+              />
+            ) : (
+              <DocumentUpload
+                collectionId={collectionId}
+                onUploadComplete={handleUploadComplete}
+                onUploadError={handleUploadError}
+              />
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Document Search */}
-      <DocumentSearch collectionId={collectionId} />
+      {/* View Mode Selector */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Content Views</CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'documents' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('documents')}
+              >
+                Document List
+              </Button>
+              <Button
+                variant={viewMode === 'folders' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('folders')}
+              >
+                Folder Tree
+              </Button>
+              <Button
+                variant={viewMode === 'browser' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('browser')}
+              >
+                Folder Browser
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
-      {/* Document List */}
-      <DocumentList
-        collectionId={collectionId}
-        refreshKey={refreshKey}
-        onDelete={handleDocumentDelete}
-      />
+      {/* Content Views */}
+      {viewMode === 'documents' && (
+        <>
+          {/* Document Search */}
+          <DocumentSearch collectionId={collectionId} />
+
+          {/* Document List */}
+          <DocumentList
+            collectionId={collectionId}
+            refreshKey={refreshKey}
+            onDelete={handleDocumentDelete}
+          />
+        </>
+      )}
+
+      {viewMode === 'folders' && (
+        <FolderTree 
+          collectionId={collectionId}
+          includeDocuments={true}
+          searchable={true}
+          showStatistics={true}
+        />
+      )}
+
+      {viewMode === 'browser' && (
+        <FolderBrowser 
+          collectionId={collectionId}
+          showDocuments={true}
+          allowEdit={false}
+        />
+      )}
     </div>
   )
 }

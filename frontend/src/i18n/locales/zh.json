@@ -1,0 +1,242 @@
+{
+  "navigation": {
+    "home": "首页",
+    "collections": "文档集合",
+    "articles": "🤖 AI文章",
+    "settings": "设置",
+    "appTitle": "长文章写作器"
+  },
+  "home": {
+    "title": "🤖 长文章写作器",
+    "subtitle": "AI驱动的文章生成，具有增强引用和多语言网络搜索功能",
+    "features": {
+      "generation": "⚡ 2分钟生成",
+      "citations": "📚 自动引用",
+      "multilang": "🌐 多语言搜索",
+      "references": "🔗 参考链接"
+    },
+    "knowledgeBase": {
+      "title": "知识库",
+      "description": "将您的文档整理到集合中，用于AI驱动的研究和写作。",
+      "button": "管理集合"
+    },
+    "aiGeneration": {
+      "title": "🤖 AI文章生成",
+      "description": "在2分钟内生成带有增强引用的专业文章。",
+      "button": "🚀 生成文章"
+    },
+    "gettingStarted": {
+      "title": "开始使用",
+      "step1": "创建您的第一个集合，按主题或项目组织文档",
+      "step2": "上传文档（PDF、文本文件）来构建您的知识库",
+      "step3": "在2分钟内生成带有增强引用的AI驱动文章"
+    }
+  },
+  "chat": {
+    "title": "AI文章写作器",
+    "subtitle": "集合：{{collectionId}}",
+    "clearButton": "清除",
+    "topicLabel": "文章主题",
+    "topicPlaceholder": "输入文章的主要主题...",
+    "subtopicsLabel": "子主题（可选）",
+    "subtopicsPlaceholder": "添加子主题...",
+    "addButton": "添加",
+    "articleTypeLabel": "文章类型",
+    "lengthLabel": "长度",
+    "writingStyleLabel": "写作风格",
+    "generateOutlineButton": "生成大纲",
+    "generateFullArticleButton": "生成完整文章",
+    "articleTypes": {
+      "comprehensive": "综合性",
+      "tutorial": "教程",
+      "analysis": "分析",
+      "overview": "概述",
+      "technical": "技术性"
+    },
+    "lengths": {
+      "short": "短篇（500-1000字）",
+      "medium": "中篇（1000-2500字）",
+      "long": "长篇（2500+字）"
+    },
+    "writingStyles": {
+      "professional": "专业",
+      "conversational": "对话式",
+      "academic": "学术",
+      "technical": "技术性",
+      "casual": "随意"
+    },
+    "processing": "处理中...",
+    "processingStep": "处理步骤 {{currentStep}}/{{totalSteps}}...",
+    "stepLabel": "步骤 {{step}}/{{totalSteps}}",
+    "features": {
+      "realtime": "实时生成",
+      "interactive": "交互式聊天",
+      "citations": "智能引用",
+      "refinementSoon": "大纲改进功能即将推出！",
+      "regenerationSoon": "大纲重新生成功能即将推出！"
+    },
+    "messages": {
+      "researchComplete": "研究完成：从 {{documents}} 个文档中找到 {{chunks}} 个相关块",
+      "outlineGenerated": "为\"{{topic}}\"生成了大纲"
+    },
+    "errors": {
+      "generateFailed": "生成文章失败：{{error}}",
+      "unknown": "未知错误"
+    },
+    "articleGeneration": "文章生成",
+    "feedbackPlaceholder": "分享您对当前步骤的反馈、改进建议或问题...",
+    "startGeneration": "开始生成",
+    "sendFeedback": "发送反馈",
+    "generating": "生成中...",
+    "generatingContent": "生成内容中...",
+    "quickActions": "快速操作",
+    "currentContext": "当前上下文",
+    "topic": "主题",
+    "collection": "集合",
+    "status": "状态",
+    "step": {
+      "topic": "主题选择",
+      "research": "研究中",
+      "outline": "大纲制作中", 
+      "content": "内容写作中",
+      "complete": "完成"
+    },
+    "suggestions": {
+      "makeMoreDetailed": "增加更多细节",
+      "addMoreSources": "添加更多来源",
+      "changeTone": "改变语调",
+      "focusOnRecent": "关注最新来源",
+      "expandScope": "扩大研究范围",
+      "addSpecificTerms": "添加特定搜索词",
+      "reorderSections": "重新排序章节",
+      "addMoreSections": "添加更多章节",
+      "expandExamples": "扩展示例"
+    },
+    "searchingKnowledge": "正在搜索知识库...",
+    "creatingOutline": "正在创建文章大纲...",
+    "outlineComplete": "大纲完成！您现在可以提供反馈或批准继续。",
+    "generationComplete": "文章生成完成！",
+    "processingMessage": "正在处理您的请求...",
+    "researchComplete": "研究完成：从{{documents}}个文档中找到{{chunks}}个相关片段",
+    "researchCompleteWeb": "研究完成：找到{{chunks}}个网络搜索结果（本地知识库不可用）",
+    "outlineGenerated": "已为\"{{topic}}\"生成大纲",
+    "errorMessage": "错误：{{error}}",
+    "export": "导出",
+    "reset": "重置"
+  },
+  "articles": {
+    "generatedTitle": "生成的文章",
+    "collectionLabel": "集合 {{collectionId}}",
+    "subtitle": "您的AI生成的文章及引用",
+    "status": {
+      "pending": "待处理",
+      "outlining": "大纲制作中",
+      "drafting": "草稿制作中",
+      "completed": "已完成",
+      "generating": "生成中...",
+      "failed": "失败",
+      "notAvailable": "不可用"
+    },
+    "noArticles": "尚无文章",
+    "noArticlesDescription": "生成您的第一篇带有增强引用的AI文章！",
+    "deleteButton": "删除",
+    "deleteConfirm": "您确定要删除这篇文章吗？",
+    "viewButton": "查看文章",
+    "wordCount": "{{count}}字",
+    "citationCount": "{{count}}个引用",
+    "noCitations": "无引用"
+  },
+  "settings": {
+    "title": "设置",
+    "subtitle": "配置AI提供商和服务",
+    "backButton": "返回首页",
+    "saveButton": "保存设置",
+    "savingButton": "保存中...",
+    "saveSuccess": "✓ 设置保存成功",
+    "testButton": "测试",
+    "tabs": {
+      "llm": "LLM提供商",
+      "embedding": "嵌入模型",
+      "search": "网络搜索",
+      "ui": "界面"
+    },
+    "llm": {
+      "title": "LLM配置",
+      "description": "配置用于文章生成的语言模型",
+      "provider": "提供商",
+      "model": "模型",
+      "apiKey": "API密钥",
+      "apiKeyPlaceholder": "输入您的API密钥",
+      "baseUrl": "基础URL",
+      "baseUrlPlaceholder": "例如：http://localhost:11434",
+      "temperature": "温度",
+      "maxTokens": "最大令牌数"
+    },
+    "embedding": {
+      "title": "嵌入配置",
+      "description": "配置知识库搜索的嵌入模型"
+    },
+    "search": {
+      "title": "网络搜索配置",
+      "description": "配置补充研究的网络搜索",
+      "enableLabel": "启用网络搜索后备"
+    },
+    "ui": {
+      "title": "界面设置",
+      "description": "自定义您的用户界面偏好",
+      "language": "语言",
+      "theme": "主题"
+    },
+    "status": {
+      "testing": "测试中...",
+      "connected": "已连接",
+      "failed": "失败",
+      "notTested": "未测试"
+    }
+  },
+  "collections": {
+    "title": "知识库集合",
+    "subtitle": "管理您的文档集合和知识库",
+    "createButton": "创建集合",
+    "chatButton": "聊天",
+    "articlesButton": "文章",
+    "detailsButton": "详情",
+    "noCollections": "未找到集合",
+    "noCollectionsDescription": "创建您的第一个知识库集合开始使用",
+    "noDescription": "无描述",
+    "table": {
+      "name": "名称",
+      "description": "描述", 
+      "documents": "文档",
+      "chunks": "数据块",
+      "model": "模型",
+      "created": "创建时间",
+      "actions": "操作"
+    },
+    "deleteConfirm": "您确定要删除\"{{name}}\"吗？此操作无法撤销。",
+    "deleteFailed": "删除集合失败：{{error}}"
+  },
+  "outline": {
+    "title": "文章大纲：",
+    "approveButton": "✓ 批准并生成文章",
+    "refineButton": "✏️ 改进大纲", 
+    "regenerateButton": "🔄 重新生成",
+    "feedbackButton": "💬 添加反馈",
+    "feedbackLabel": "您的反馈：",
+    "feedbackPlaceholder": "您希望对此大纲做哪些修改？",
+    "submitFeedbackButton": "提交反馈"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "create": "创建",
+    "update": "更新",
+    "search": "搜索",
+    "close": "关闭"
+  }
+}

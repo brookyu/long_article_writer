@@ -41,11 +41,13 @@ class SettingsRequest(BaseModel):
     llm_settings: Dict[str, Any]
     embedding_settings: Dict[str, Any]
     search_settings: Dict[str, Any]
+    ui_settings: Optional[Dict[str, Any]] = None
 
 class SettingsResponse(BaseModel):
     llm_settings: Dict[str, Any]
     embedding_settings: Dict[str, Any]
     search_settings: Dict[str, Any]
+    ui_settings: Dict[str, Any]
 
 
 @router.get("/config", status_code=HTTPStatus.OK)
@@ -60,6 +62,7 @@ async def get_settings_config(db: AsyncSession = Depends(get_db)) -> SettingsRes
         llm_settings = {}
         embedding_settings = {}
         search_settings = {}
+        ui_settings = {}
         
         for setting in settings:
             config = setting.config_json or {}
@@ -75,6 +78,8 @@ async def get_settings_config(db: AsyncSession = Depends(get_db)) -> SettingsRes
                 embedding_settings = setting_data
             elif setting.provider in ["searxng", "google", "bing", "duckduckgo"]:
                 search_settings = setting_data
+            elif setting.provider == "ui":
+                ui_settings = config
         
         # Return defaults if no settings found
         if not llm_settings:
@@ -100,10 +105,17 @@ async def get_settings_config(db: AsyncSession = Depends(get_db)) -> SettingsRes
                 "enabled": True
             }
         
+        if not ui_settings:
+            ui_settings = {
+                "language": "en",
+                "theme": "light"
+            }
+        
         return SettingsResponse(
             llm_settings=llm_settings,
             embedding_settings=embedding_settings,
-            search_settings=search_settings
+            search_settings=search_settings,
+            ui_settings=ui_settings
         )
         
     except Exception as e:
@@ -157,6 +169,17 @@ async def save_settings_config(request: SettingsRequest, db: AsyncSession = Depe
                 is_active=True
             )
             db.add(search_setting)
+        
+        # Save UI settings
+        if request.ui_settings:
+            ui_setting = Setting(
+                provider="ui",
+                key_alias="UI Configuration",
+                model_name=None,
+                config_json=request.ui_settings,
+                is_active=True
+            )
+            db.add(ui_setting)
         
         await db.commit()
         return {"message": "Settings saved successfully"}
@@ -405,4 +428,22 @@ async def test_search_connection(request: SearchTestRequest) -> Dict[str, Any]:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
             detail=f"Connection test failed: {str(e)}"
+        )
+
+
+@router.get("/ollama-models")
+async def list_ollama_models():
+    """List all available Ollama models"""
+    try:
+        ollama_client = OllamaClient()
+        models = await ollama_client.list_models()
+        return {
+            "status": "success",
+            "models": models
+        }
+    except Exception as e:
+        logger.error(f"Failed to list Ollama models: {e}")
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve models: {str(e)}"
         )

@@ -128,14 +128,14 @@ export function DocumentUpload({ collectionId, onUploadComplete, onUploadError }
               Drop files here or click to browse
             </p>
             <p className="text-sm text-muted-foreground">
-              Supports PDF, TXT, DOC, DOCX files up to 10MB
+              Supports PDF, TXT, DOC, DOCX, MD, HTML, RTF, CSV, JSON files up to 10MB
             </p>
           </div>
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.txt,.doc,.docx"
+            accept=".pdf,.txt,.doc,.docx,.md,.markdown,.html,.htm,.rtf,.csv,.json"
             onChange={(e) => handleFileSelect(e.target.files)}
             className="hidden"
           />

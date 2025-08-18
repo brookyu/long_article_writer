@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { StreamingChat } from '@/components/chat/StreamingChat'
+import { EnhancedAgentChat } from '@/components/chat/EnhancedAgentChat'
+import { StepByStepAgentChat } from '@/components/chat/StepByStepAgentChat'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, BookOpen, FileText } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ArrowLeft, BookOpen, FileText, Bot, MessageSquare } from 'lucide-react'
 import { collectionsApi } from '@/lib/api'
 import { Collection } from '@/types/collections'
 
@@ -114,11 +117,38 @@ export function WritingPage() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full max-w-6xl mx-auto">
-          <StreamingChat 
-            collectionId={parseInt(collectionId!)} 
-            collectionName={collection.name}
-          />
+        <div className="h-full max-w-7xl mx-auto p-4">
+          <Tabs defaultValue="step-by-step" className="h-full flex flex-col">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="step-by-step" className="flex items-center gap-2">
+                <Bot className="w-4 h-4" />
+                Step-by-Step Agents
+              </TabsTrigger>
+              <TabsTrigger value="enhanced" className="flex items-center gap-2">
+                <Bot className="w-4 h-4" />
+                Enhanced AI Agents
+              </TabsTrigger>
+              <TabsTrigger value="simple" className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Simple Chat
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="step-by-step" className="flex-1 mt-0">
+              <StepByStepAgentChat collectionId={parseInt(collectionId!)} />
+            </TabsContent>
+            
+            <TabsContent value="enhanced" className="flex-1 mt-0">
+              <EnhancedAgentChat collectionId={parseInt(collectionId!)} />
+            </TabsContent>
+            
+            <TabsContent value="simple" className="flex-1 mt-0">
+              <StreamingChat 
+                collectionId={parseInt(collectionId!)} 
+                collectionName={collection.name}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

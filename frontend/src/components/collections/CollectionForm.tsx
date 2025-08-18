@@ -24,7 +24,6 @@ export function CollectionForm({ isOpen, onClose, onSave, collection }: Collecti
   const [formData, setFormData] = useState<CollectionCreate>({
     name: '',
     description: '',
-    embedding_model: 'nomic-embed-text',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,13 +35,11 @@ export function CollectionForm({ isOpen, onClose, onSave, collection }: Collecti
       setFormData({
         name: collection.name,
         description: collection.description || '',
-        embedding_model: collection.embedding_model || 'nomic-embed-text',
       })
     } else {
       setFormData({
         name: '',
         description: '',
-        embedding_model: 'nomic-embed-text',
       })
     }
     setError(null)
@@ -117,19 +114,7 @@ export function CollectionForm({ isOpen, onClose, onSave, collection }: Collecti
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="embedding_model">Embedding Model</Label>
-            <Input
-              id="embedding_model"
-              value={formData.embedding_model}
-              onChange={(e) => handleChange('embedding_model', e.target.value)}
-              placeholder="nomic-embed-text"
-              disabled={loading}
-            />
-            <p className="text-xs text-muted-foreground">
-              The embedding model to use for document processing
-            </p>
-          </div>
+
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>

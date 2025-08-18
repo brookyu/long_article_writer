@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CollectionList } from '@/components/collections/CollectionList'
 import { CollectionForm } from '@/components/collections/CollectionForm'
 import { Collection } from '@/types/collections'
 import { collectionsApi } from '@/lib/api'
 
 export function CollectionsPage() {
+  const { t } = useTranslation()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCollection, setEditingCollection] = useState<Collection | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -20,12 +22,12 @@ export function CollectionsPage() {
   }
 
   const handleDelete = async (collection: Collection) => {
-    if (window.confirm(`Are you sure you want to delete "${collection.name}"? This action cannot be undone.`)) {
+    if (window.confirm(t('collections.deleteConfirm', { name: collection.name }))) {
       try {
         await collectionsApi.delete(collection.id)
         setRefreshKey(prev => prev + 1) // Trigger refresh
       } catch (error) {
-        alert('Failed to delete collection: ' + (error instanceof Error ? error.message : 'Unknown error'))
+        alert(t('collections.deleteFailed', { error: error instanceof Error ? error.message : t('common.error') }))
       }
     }
   }

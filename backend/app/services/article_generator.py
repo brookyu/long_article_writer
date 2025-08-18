@@ -3,6 +3,7 @@ AI-powered article generation service using knowledge base and LLM
 """
 
 import asyncio
+import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
@@ -10,12 +11,34 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# Import web search functionality
+try:
+    from .web_search import WebSearchManager, HybridResearchEngine
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    logger.warning("Web search functionality not available")
+    WEB_SEARCH_AVAILABLE = False
+
 
 class ArticleResearcher:
-    """Research assistant that finds relevant content from knowledge base"""
+    """Research assistant that finds relevant content from knowledge base and web"""
     
     def __init__(self, search_function):
         self.search_function = search_function
+        # Initialize web search if available
+        if WEB_SEARCH_AVAILABLE:
+            try:
+                self.web_search_manager = WebSearchManager()
+                self.hybrid_engine = HybridResearchEngine(search_function, self.web_search_manager)
+                logger.info("🌐 Web search initialized successfully")
+            except Exception as e:
+                logger.warning(f"🌐 Web search initialization failed: {e}")
+                self.web_search_manager = None
+                self.hybrid_engine = None
+        else:
+            logger.info("🌐 Web search not available")
+            self.web_search_manager = None
+            self.hybrid_engine = None
     
     async def research_topic(
         self, 
@@ -30,6 +53,8 @@ class ArticleResearcher:
         Returns:
             Dict containing research results organized by search queries
         """
+        logger.info(f"🔍 Starting research for topic: '{topic}' in collection {collection_id}")
+        
         try:
             research_results = {
                 "main_topic": topic,
@@ -41,37 +66,73 @@ class ArticleResearcher:
             
             # Research main topic
             logger.info(f"Researching main topic: {topic}")
-            main_results = await self.search_function(collection_id, topic)
-            
-            research_results["research_data"]["main_topic"] = {
-                "query": topic,
-                "results": main_results.get("matches", [])[:max_chunks_per_search],
-                "total_found": main_results.get("total_matches", 0)
-            }
-            research_results["search_queries_used"].append(topic)
-            
-            # Track statistics
-            for match in main_results.get("matches", []):
-                research_results["unique_documents"].add(match.get("document_id"))
-                research_results["total_chunks_found"] += 1
+            try:
+                main_results = await self.search_function(collection_id, topic)
+                research_results["research_data"]["main_topic"] = {
+                    "query": topic,
+                    "results": main_results.get("matches", [])[:max_chunks_per_search],
+                    "total_found": main_results.get("total_matches", 0)
+                }
+                research_results["search_queries_used"].append(topic)
+                
+                # Track statistics
+                for match in main_results.get("matches", []):
+                    research_results["unique_documents"].add(match.get("document_id"))
+                    research_results["total_chunks_found"] += 1
+            except Exception as search_error:
+                logger.warning(f"Local search failed for main topic: {search_error}")
+                research_results["research_data"]["main_topic"] = {
+                    "query": topic,
+                    "results": [],
+                    "total_found": 0,
+                    "error": str(search_error)
+                }
+                research_results["search_queries_used"].append(topic)
             
             # Research subtopics if provided
             if subtopics:
                 for subtopic in subtopics:
                     logger.info(f"Researching subtopic: {subtopic}")
-                    subtopic_results = await self.search_function(collection_id, subtopic)
-                    
-                    research_results["research_data"][f"subtopic_{subtopic}"] = {
-                        "query": subtopic,
-                        "results": subtopic_results.get("matches", [])[:max_chunks_per_search],
-                        "total_found": subtopic_results.get("total_matches", 0)
-                    }
-                    research_results["search_queries_used"].append(subtopic)
-                    
-                    # Update statistics
-                    for match in subtopic_results.get("matches", []):
-                        research_results["unique_documents"].add(match.get("document_id"))
-                        research_results["total_chunks_found"] += 1
+                    try:
+                        subtopic_results = await self.search_function(collection_id, subtopic)
+                        research_results["research_data"][f"subtopic_{subtopic}"] = {
+                            "query": subtopic,
+                            "results": subtopic_results.get("matches", [])[:max_chunks_per_search],
+                            "total_found": subtopic_results.get("total_matches", 0)
+                        }
+                        research_results["search_queries_used"].append(subtopic)
+                        
+                        # Update statistics
+                        for match in subtopic_results.get("matches", []):
+                            research_results["unique_documents"].add(match.get("document_id"))
+                            research_results["total_chunks_found"] += 1
+                    except Exception as search_error:
+                        logger.warning(f"Local search failed for subtopic '{subtopic}': {search_error}")
+                        research_results["research_data"][f"subtopic_{subtopic}"] = {
+                            "query": subtopic,
+                            "results": [],
+                            "total_found": 0,
+                            "error": str(search_error)
+                        }
+                        research_results["search_queries_used"].append(subtopic)
+            
+            # If no local results found, try web search as fallback
+            if research_results["total_chunks_found"] == 0:
+                if self.web_search_manager:
+                    logger.info(f"🌐 No local results found for '{topic}', trying web search...")
+                    try:
+                        web_results = await self.web_search_manager.search(topic, max_results=3)
+                        if web_results:
+                            research_results["web_search_results"] = [result.to_dict() for result in web_results]
+                            research_results["total_chunks_found"] = len(web_results)
+                            research_results["source_type"] = "web_search"
+                            logger.info(f"🌐 Web search found {len(web_results)} results")
+                        else:
+                            logger.info("🌐 Web search also returned no results")
+                    except Exception as e:
+                        logger.warning(f"🌐 Web search failed: {e}")
+                else:
+                    logger.info("🌐 Web search not available, proceeding with LLM-only generation")
             
             # Convert set to list for JSON serialization
             research_results["unique_documents"] = list(research_results["unique_documents"])
@@ -170,7 +231,7 @@ Please ensure the outline flows logically and covers the topic comprehensively b
 
         try:
             logger.info(f"Generating outline for: {topic}")
-            outline_text = await self.llm_function(prompt, max_tokens=1500)
+            outline_text = await self.llm_function(prompt, max_tokens=800)
             
             return {
                 "topic": topic,
@@ -346,9 +407,13 @@ class ArticleGenerator:
     """Main article generation orchestrator"""
     
     def __init__(self, llm_function, search_function):
+        logger.info("🔧 Initializing ArticleGenerator...")
+        self.llm_function = llm_function
+        self.search_function = search_function
         self.researcher = ArticleResearcher(search_function)
         self.outline_generator = ArticleOutlineGenerator(llm_function)
         self.content_generator = ArticleContentGenerator(llm_function, search_function)
+        logger.info("✅ ArticleGenerator initialized successfully")
     
     async def generate_article(
         self,
@@ -384,19 +449,29 @@ class ArticleGenerator:
                 }
             
             # Create research summary
+            source_type = research_results.get("source_type", "local")
             research_summary = f"""
 Research Summary for "{topic}":
-- Total relevant chunks found: {research_results['total_chunks_found']}
+- Total relevant sources found: {research_results['total_chunks_found']}
+- Source type: {source_type}
 - Documents consulted: {len(research_results['unique_documents'])}
 - Search queries used: {', '.join(research_results['search_queries_used'])}
 
 Key findings from research:
 """
             
+            # Add local search results
             for research_key, research_info in research_results["research_data"].items():
                 top_result = research_info["results"][0] if research_info["results"] else None
                 if top_result:
                     research_summary += f"- {research_info['query']}: {top_result.get('preview', '')[:100]}...\n"
+            
+            # Add web search results if available
+            if research_results.get("web_search_results"):
+                research_summary += "\nWeb Search Results:\n"
+                for web_result in research_results["web_search_results"][:3]:
+                    research_summary += f"- {web_result['title']}: {web_result['snippet'][:100]}...\n"
+                    research_summary += f"  Source: {web_result['url']}\n"
             
             # Step 2: Generate outline
             logger.info("Step 2: Generating article outline...")
@@ -486,3 +561,113 @@ Key findings from research:
                 "topic": topic,
                 "generation_time_seconds": (datetime.now() - generation_start).total_seconds()
             }
+    
+    async def refine_outline(
+        self,
+        original_outline: str,
+        topic: str,
+        refinement_instructions: str,
+        collection_id: int
+    ) -> str:
+        """Refine an existing outline based on user feedback"""
+        
+        logger.info(f"Refining outline for topic: {topic}")
+        
+        # Create refinement prompt
+        refinement_prompt = f"""Based on the user's feedback, please refine the following article outline.
+
+Original Topic: {topic}
+Original Outline:
+{original_outline}
+
+User Feedback/Refinement Instructions:
+{refinement_instructions}
+
+Please provide an improved outline that addresses the user's feedback while maintaining the structure and quality. Focus on incorporating their suggestions and improving the content accordingly.
+
+Refined Outline:"""
+        
+        try:
+            logger.info("🔄 Starting outline refinement with AI model...")
+            refined_outline = await self.llm_function(refinement_prompt, max_tokens=600)  # Reduced tokens for faster response
+            logger.info("✅ Outline refinement completed successfully")
+            return refined_outline.strip()
+            
+        except Exception as e:
+            logger.error(f"Outline refinement failed: {e}")
+            raise Exception(f"Failed to refine outline: {str(e)}")
+    
+    async def generate_content(
+        self,
+        outline: Any,
+        topic: str,
+        collection_id: int,
+        content_feedback: str = ""
+    ) -> str:
+        """Generate article content from an approved outline"""
+        
+        logger.info(f"Generating content for topic: {topic}")
+        
+        # Convert outline to string if it's a dict
+        outline_text = json.dumps(outline, indent=2) if isinstance(outline, dict) else str(outline)
+        
+        # Create content generation prompt
+        content_prompt = f"""Generate a comprehensive article based on the following outline:
+
+Topic: {topic}
+Outline:
+{outline_text}
+
+{f"Additional Instructions: {content_feedback}" if content_feedback else ""}
+
+Please write a detailed, well-structured article that follows the outline. Include:
+- Clear section headings
+- Comprehensive content for each section
+- Professional writing style
+- Logical flow between sections
+- Conclusion that ties everything together
+
+Article Content:"""
+        
+        try:
+            content = await self.llm_function(content_prompt, max_tokens=2000)
+            logger.info("Content generation completed successfully")
+            return content.strip()
+            
+        except Exception as e:
+            logger.error(f"Content generation failed: {e}")
+            raise Exception(f"Failed to generate content: {str(e)}")
+    
+    async def refine_content(
+        self,
+        original_content: str,
+        topic: str,
+        refinement_instructions: str,
+        collection_id: int
+    ) -> str:
+        """Refine existing article content based on user feedback"""
+        
+        logger.info(f"Refining content for topic: {topic}")
+        
+        # Create refinement prompt
+        refinement_prompt = f"""Please refine the following article content based on the user's feedback.
+
+Topic: {topic}
+Original Content:
+{original_content}
+
+User Feedback/Refinement Instructions:
+{refinement_instructions}
+
+Please provide an improved version of the article that addresses the user's feedback while maintaining quality and coherence. Focus on incorporating their suggestions and improving the content accordingly.
+
+Refined Content:"""
+        
+        try:
+            refined_content = await self.llm_function(refinement_prompt, max_tokens=2000)
+            logger.info("Content refinement completed successfully")
+            return refined_content.strip()
+            
+        except Exception as e:
+            logger.error(f"Content refinement failed: {e}")
+            raise Exception(f"Failed to refine content: {str(e)}")

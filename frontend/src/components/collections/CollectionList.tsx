@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Database, FileText, Clock, ExternalLink } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Plus, Edit, Trash2, Database, FileText, Clock, ExternalLink, MessageSquare } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +16,7 @@ interface CollectionListProps {
 }
 
 export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionListProps) {
+  const { t } = useTranslation()
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -65,13 +67,13 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
         <CardContent>
           <div className="text-center py-12">
             <Database className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Collections Found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('collections.noCollections')}</h3>
             <p className="text-muted-foreground mb-6">
-              Create your first knowledge base collection to get started
+              {t('collections.noCollectionsDescription', 'Create your first knowledge base collection to get started')}
             </p>
             <Button onClick={onCreateNew}>
               <Plus className="h-4 w-4 mr-2" />
-              Create Collection
+              {t('collections.createButton')}
             </Button>
           </div>
         </CardContent>
@@ -84,14 +86,14 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Knowledge Base Collections</h2>
+          <h2 className="text-2xl font-bold">{t('collections.title')}</h2>
           <p className="text-muted-foreground">
-            Manage your document collections and knowledge bases
+            {t('collections.subtitle')}
           </p>
         </div>
         <Button onClick={onCreateNew}>
           <Plus className="h-4 w-4 mr-2" />
-          New Collection
+          {t('collections.createButton')}
         </Button>
       </div>
 
@@ -100,13 +102,13 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Documents</TableHead>
-              <TableHead>Chunks</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t('collections.table.name', 'Name')}</TableHead>
+              <TableHead>{t('collections.table.description', 'Description')}</TableHead>
+              <TableHead>{t('collections.table.documents', 'Documents')}</TableHead>
+              <TableHead>{t('collections.table.chunks', 'Chunks')}</TableHead>
+              <TableHead>{t('collections.table.model', 'Model')}</TableHead>
+              <TableHead>{t('collections.table.created', 'Created')}</TableHead>
+              <TableHead className="text-right">{t('collections.table.actions', 'Actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -125,7 +127,7 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
                 </TableCell>
                 <TableCell>
                   <span className="text-muted-foreground">
-                    {collection.description || 'No description'}
+                    {collection.description || t('collections.noDescription', 'No description')}
                   </span>
                 </TableCell>
                 <TableCell>
@@ -152,8 +154,14 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
+                    <Link to={`/chat/${collection.id}`}>
+                      <Button variant="outline" size="sm" title="AI Article Writer">
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        {t('collections.chatButton')}
+                      </Button>
+                    </Link>
                     <Link to={`/collections/${collection.id}`}>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" title="View Collection">
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     </Link>
@@ -161,6 +169,7 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
                       variant="ghost"
                       size="sm"
                       onClick={() => onEdit(collection)}
+                      title="Edit Collection"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -168,6 +177,7 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
                       variant="ghost"
                       size="sm"
                       onClick={() => onDelete(collection)}
+                      title="Delete Collection"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>

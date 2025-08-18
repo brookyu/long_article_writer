@@ -1,0 +1,7 @@
+This is a test document for checking if chunks are properly created. 
+
+The document processing pipeline should extract this text, create chunks from it, generate embeddings, and store both in Milvus and SQL databases.
+
+This is a second paragraph to ensure we have enough content for multiple chunks. The chunking algorithm should split this text into meaningful segments.
+
+This is the third paragraph with additional content to make sure the document has sufficient text for proper chunking and processing.

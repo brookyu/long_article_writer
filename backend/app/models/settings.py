@@ -10,7 +10,7 @@ class Setting(BaseModel):
     """Settings for LLM providers, embedding models, etc."""
     __tablename__ = "settings"
     
-    provider = Column(String(50), nullable=False, comment="Provider type: ollama, openai, anthropic, serpapi, etc.")
+    provider = Column(String(50), nullable=False, comment="Provider type: ollama, openai, anthropic, serpapi, language, etc.")
     key_alias = Column(String(100), nullable=False, comment="Human-readable name for this configuration")
     encrypted_secret = Column(Text, comment="Encrypted API key or secret")
     model_name = Column(String(100), comment="Specific model name to use")

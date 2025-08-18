@@ -1,9 +1,143 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Send, Download, RefreshCw } from 'lucide-react'
+import { Loader2, Send, Download, RefreshCw, Edit3, CheckCircle, MessageSquare, ThumbsUp, ThumbsDown } from 'lucide-react'
+
+// OutlineDisplay Component
+interface OutlineDisplayProps {
+  outlineData: OutlineData
+  onFeedback: (outlineData: OutlineData, feedback: string, action: 'approve' | 'refine' | 'regenerate') => void
+}
+
+function OutlineDisplay({ outlineData, onFeedback }: OutlineDisplayProps) {
+  const { t } = useTranslation()
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+
+  const handleAction = (action: 'approve' | 'refine' | 'regenerate') => {
+    if (action === 'approve') {
+      onFeedback(outlineData, '', action)
+    } else {
+      if (feedbackText.trim()) {
+        onFeedback(outlineData, feedbackText, action)
+        setFeedbackText('')
+        setShowFeedback(false)
+      } else {
+        setShowFeedback(true)
+      }
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Outline Header */}
+      <div className="border-b pb-2">
+        <h3 className="font-semibold text-lg">{outlineData.topic}</h3>
+        <div className="flex gap-2 mt-2">
+          <Badge variant="secondary">{outlineData.article_type}</Badge>
+          <Badge variant="outline">{outlineData.target_length}</Badge>
+        </div>
+      </div>
+
+      {/* Outline Content */}
+      <div className="space-y-3">
+        <h4 className="font-medium">{t('outline.title', 'Article Outline:')}</h4>
+        <div className="bg-gray-50 rounded-lg p-4">
+          <pre className="whitespace-pre-wrap text-sm font-mono">
+            {outlineData.outline_text}
+          </pre>
+        </div>
+      </div>
+
+      {/* Sections Summary */}
+      {outlineData.sections && outlineData.sections.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="font-medium">Sections ({outlineData.sections.length}):</h4>
+          <div className="grid gap-2">
+            {outlineData.sections.map((section, index) => (
+              <div key={index} className="bg-blue-50 rounded p-3 border border-blue-200">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h5 className="font-medium text-sm">{section.title}</h5>
+                    {section.description && (
+                      <p className="text-xs text-gray-600 mt-1">{section.description}</p>
+                    )}
+                  </div>
+                  {section.estimated_words && (
+                    <Badge variant="outline" className="text-xs ml-2">
+                      ~{section.estimated_words} words
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Input */}
+      {showFeedback && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{t('outline.feedbackLabel', 'Your feedback:')}</label>
+          <Input
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            placeholder={t('outline.feedbackPlaceholder')}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && feedbackText.trim()) {
+                handleAction('refine')
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 pt-2">
+        <Button 
+          onClick={() => handleAction('approve')} 
+          size="sm" 
+          className="bg-green-600 hover:bg-green-700"
+        >
+          <CheckCircle className="w-4 h-4 mr-1" />
+          {t('outline.approveButton')}
+        </Button>
+        
+        <Button 
+          onClick={() => handleAction('refine')} 
+          variant="outline" 
+          size="sm"
+        >
+          <Edit3 className="w-4 h-4 mr-1" />
+          {t('outline.refineButton')}
+        </Button>
+        
+        <Button 
+          onClick={() => handleAction('regenerate')} 
+          variant="outline" 
+          size="sm"
+        >
+          <RefreshCw className="w-4 h-4 mr-1" />
+          {t('outline.regenerateButton')}
+        </Button>
+
+        {!showFeedback && (
+          <Button 
+            onClick={() => setShowFeedback(true)} 
+            variant="ghost" 
+            size="sm"
+          >
+            <MessageSquare className="w-4 h-4 mr-1" />
+            Add Feedback
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 interface StreamingChatProps {
   collectionId: number
@@ -12,11 +146,24 @@ interface StreamingChatProps {
 
 interface Message {
   id: string
-  type: 'user' | 'system' | 'content' | 'status' | 'error'
+  type: 'user' | 'system' | 'content' | 'status' | 'error' | 'outline'
   content: string
   timestamp: Date
   step?: number
   totalSteps?: number
+  outlineData?: OutlineData
+}
+
+interface OutlineData {
+  topic: string
+  article_type: string
+  target_length: string
+  outline_text: string
+  sections: Array<{
+    title: string
+    description: string
+    estimated_words: number
+  }>
 }
 
 interface StreamingChatState {
@@ -29,6 +176,7 @@ interface StreamingChatState {
 }
 
 export function StreamingChat({ collectionId, collectionName }: StreamingChatProps) {
+  const { t } = useTranslation()
   const [state, setState] = useState<StreamingChatState>({
     messages: [],
     isStreaming: false,
@@ -60,7 +208,7 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
       ...prev,
       messages: [...prev.messages, {
         ...message,
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date()
       }]
     }))
@@ -75,6 +223,100 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
 
   const removeSubtopic = (index: number) => {
     setSubtopics(subtopics.filter((_, i) => i !== index))
+  }
+
+  const handleOutlineFeedback = (outlineData: OutlineData, feedback: string, action: 'approve' | 'refine' | 'regenerate') => {
+    if (action === 'approve') {
+      addMessage({
+        type: 'user',
+        content: `✅ Outline approved! Proceeding with article generation.`
+      })
+      // Trigger full article generation
+      generateFullArticle(outlineData)
+    } else if (action === 'refine') {
+      addMessage({
+        type: 'user', 
+        content: `📝 Refine outline: ${feedback}`
+      })
+      // TODO: Trigger outline refinement
+      refineOutline(outlineData, feedback)
+    } else if (action === 'regenerate') {
+      addMessage({
+        type: 'user',
+        content: `🔄 Regenerating outline with feedback: ${feedback}`
+      })
+      // TODO: Trigger outline regeneration
+      regenerateOutline(outlineData, feedback)
+    }
+  }
+
+  const generateFullArticle = async (outlineData: OutlineData) => {
+    setState(prev => ({ ...prev, isStreaming: true }))
+    
+    try {
+      const response = await fetch('/api/articles/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collection_id: collectionId,
+          topic: outlineData.topic,
+          subtopics: subtopics.length > 0 ? subtopics : null,
+          article_type: outlineData.article_type,
+          target_length: outlineData.target_length,
+          writing_style: writingStyle,
+          approved_outline: outlineData
+        })
+      })
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value)
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                handleStreamMessage(data)
+              } catch (e) {
+                console.error('Failed to parse stream data:', e)
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      addMessage({
+        type: 'error',
+        content: t('chat.errors.generateFailed', { error: error instanceof Error ? error.message : t('chat.errors.unknown') })
+      })
+    } finally {
+      setState(prev => ({ ...prev, isStreaming: false }))
+    }
+  }
+
+  const refineOutline = async (outlineData: OutlineData, feedback: string) => {
+    // TODO: Implement outline refinement API call
+    addMessage({
+      type: 'system',
+      content: t('chat.features.refinementSoon')
+    })
+  }
+
+  const regenerateOutline = async (outlineData: OutlineData, feedback: string) => {
+    // TODO: Implement outline regeneration API call  
+    addMessage({
+      type: 'system',
+      content: t('chat.features.regenerationSoon')
+    })
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -220,7 +462,7 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
     } catch (error) {
       addMessage({
         type: 'error',
-        content: `Failed to generate article: ${error instanceof Error ? error.message : 'Unknown error'}`
+        content: t('chat.errors.generateFailed', { error: error instanceof Error ? error.message : t('chat.errors.unknown') })
       })
     } finally {
       setState(prev => ({ ...prev, isStreaming: false }))
@@ -246,14 +488,18 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
       case 'research':
         addMessage({
           type: 'system',
-          content: `Research complete: Found ${data.data.total_chunks_found} relevant chunks from ${data.data.unique_documents.length} documents`
+          content: t('chat.messages.researchComplete', { 
+            chunks: data.data.total_chunks_found, 
+            documents: data.data.unique_documents.length 
+          })
         })
         break
 
       case 'outline':
         addMessage({
-          type: 'content',
-          content: `**Generated Outline:**\n\n${data.data.outline_text}`
+          type: 'outline',
+          content: t('chat.messages.outlineGenerated', { topic: data.data.topic }),
+          outlineData: data.data
         })
         break
 
@@ -353,9 +599,9 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
       <div className="border-b p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold">AI Article Writer</h2>
+            <h2 className="text-xl font-semibold">{t('chat.title')}</h2>
             <p className="text-sm text-muted-foreground">
-              Collection: {collectionName || `ID ${collectionId}`}
+              {t('chat.subtitle', { collectionId: collectionName || `ID ${collectionId}` })}
             </p>
           </div>
           <Button
@@ -365,7 +611,7 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
             disabled={state.isStreaming}
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Clear
+            {t('chat.clearButton')}
           </Button>
         </div>
       </div>
@@ -375,11 +621,11 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
         <div className="space-y-4">
           {/* Topic Input */}
           <div>
-            <label className="text-sm font-medium">Article Topic</label>
+            <label className="text-sm font-medium">{t('chat.topicLabel')}</label>
             <Input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="Enter the main topic for your article..."
+              placeholder={t('chat.topicPlaceholder')}
               disabled={state.isStreaming}
               onKeyPress={handleKeyPress}
               className="mt-1"
@@ -388,12 +634,12 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
 
           {/* Subtopics */}
           <div>
-            <label className="text-sm font-medium">Subtopics (Optional)</label>
+            <label className="text-sm font-medium">{t('chat.subtopicsLabel')}</label>
             <div className="flex gap-2 mt-1">
               <Input
                 value={subtopicInput}
                 onChange={(e) => setSubtopicInput(e.target.value)}
-                placeholder="Add subtopic..."
+                placeholder={t('chat.subtopicsPlaceholder')}
                 disabled={state.isStreaming}
                 onKeyPress={handleKeyPress}
               />
@@ -403,7 +649,7 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
                 onClick={addSubtopic}
                 disabled={state.isStreaming || !subtopicInput.trim()}
               >
-                Add
+                {t('chat.addButton')}
               </Button>
             </div>
             {subtopics.length > 0 && (
@@ -425,46 +671,46 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
           {/* Options */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium">Article Type</label>
+              <label className="text-sm font-medium">{t('chat.articleTypeLabel')}</label>
               <select
                 value={articleType}
                 onChange={(e) => setArticleType(e.target.value as any)}
                 disabled={state.isStreaming}
                 className="w-full mt-1 px-3 py-2 border rounded-md"
               >
-                <option value="comprehensive">Comprehensive</option>
-                <option value="tutorial">Tutorial</option>
-                <option value="analysis">Analysis</option>
-                <option value="overview">Overview</option>
-                <option value="technical">Technical</option>
+                <option value="comprehensive">{t('chat.articleTypes.comprehensive', 'Comprehensive')}</option>
+                <option value="tutorial">{t('chat.articleTypes.tutorial', 'Tutorial')}</option>
+                <option value="analysis">{t('chat.articleTypes.analysis', 'Analysis')}</option>
+                <option value="overview">{t('chat.articleTypes.overview', 'Overview')}</option>
+                <option value="technical">{t('chat.articleTypes.technical', 'Technical')}</option>
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium">Length</label>
+              <label className="text-sm font-medium">{t('chat.lengthLabel')}</label>
               <select
                 value={targetLength}
                 onChange={(e) => setTargetLength(e.target.value as any)}
                 disabled={state.isStreaming}
                 className="w-full mt-1 px-3 py-2 border rounded-md"
               >
-                <option value="short">Short (500-1000 words)</option>
-                <option value="medium">Medium (1000-2500 words)</option>
-                <option value="long">Long (2500+ words)</option>
+                <option value="short">{t('chat.lengths.short', 'Short (500-1000 words)')}</option>
+                <option value="medium">{t('chat.lengths.medium', 'Medium (1000-2500 words)')}</option>
+                <option value="long">{t('chat.lengths.long', 'Long (2500+ words)')}</option>
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium">Writing Style</label>
+              <label className="text-sm font-medium">{t('chat.writingStyleLabel')}</label>
               <select
                 value={writingStyle}
                 onChange={(e) => setWritingStyle(e.target.value as any)}
                 disabled={state.isStreaming}
                 className="w-full mt-1 px-3 py-2 border rounded-md"
               >
-                <option value="professional">Professional</option>
-                <option value="conversational">Conversational</option>
-                <option value="academic">Academic</option>
-                <option value="technical">Technical</option>
-                <option value="casual">Casual</option>
+                <option value="professional">{t('chat.writingStyles.professional', 'Professional')}</option>
+                <option value="conversational">{t('chat.writingStyles.conversational', 'Conversational')}</option>
+                <option value="academic">{t('chat.writingStyles.academic', 'Academic')}</option>
+                <option value="technical">{t('chat.writingStyles.technical', 'Technical')}</option>
+                <option value="casual">{t('chat.writingStyles.casual', 'Casual')}</option>
               </select>
             </div>
           </div>
@@ -479,12 +725,12 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
               {state.isStreaming ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
+                  {t('articles.status.generating')}
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4 mr-2" />
-                  Generate Outline
+                  {t('chat.generateOutlineButton')}
                 </>
               )}
             </Button>
@@ -497,12 +743,12 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
               {state.isStreaming ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
+                  {t('articles.status.generating')}
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4 mr-2" />
-                  Generate Full Article
+                  {t('chat.generateFullArticleButton')}
                 </>
               )}
             </Button>
@@ -525,13 +771,15 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
         {state.messages.map((message) => (
           <div key={message.id} className="space-y-2">
             <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <Card className={`max-w-[80%] ${
+              <Card className={`${message.type === 'outline' ? 'max-w-[95%]' : 'max-w-[80%]'} ${
                 message.type === 'user' 
                   ? 'bg-primary text-primary-foreground' 
                   : message.type === 'error'
                   ? 'bg-destructive/10 border-destructive'
                   : message.type === 'status'
                   ? 'bg-blue-50 border-blue-200'
+                  : message.type === 'outline'
+                  ? 'bg-green-50 border-green-200'
                   : 'bg-muted'
               }`}>
                 <CardContent className="p-3">
@@ -540,13 +788,20 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
                       {message.type === 'status' && message.step && message.totalSteps && (
                         <div className="flex items-center gap-2 mb-2">
                           <Badge variant="outline" className="text-xs">
-                            Step {message.step}/{message.totalSteps}
+                            {t('chat.stepLabel', { step: message.step, totalSteps: message.totalSteps })}
                           </Badge>
                         </div>
                       )}
-                      <div className="whitespace-pre-wrap text-sm">
-                        {message.content}
-                      </div>
+                      {message.type === 'outline' && message.outlineData ? (
+                        <OutlineDisplay 
+                          outlineData={message.outlineData}
+                          onFeedback={handleOutlineFeedback}
+                        />
+                      ) : (
+                        <div className="whitespace-pre-wrap text-sm">
+                          {message.content}
+                        </div>
+                      )}
                     </div>
                     <span className="text-xs opacity-60 ml-2">
                       {message.timestamp.toLocaleTimeString()}
@@ -566,8 +821,8 @@ export function StreamingChat({ collectionId, collectionName }: StreamingChatPro
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">
                     {state.currentStep > 0 && state.totalSteps > 0 
-                      ? `Processing step ${state.currentStep}/${state.totalSteps}...`
-                      : 'Processing...'
+                      ? t('chat.processingStep', { currentStep: state.currentStep, totalSteps: state.totalSteps })
+                      : t('chat.processing')
                     }
                   </span>
                 </div>

@@ -1,0 +1,5 @@
+New test document with multiple paragraphs for chunk testing.
+
+This document should be processed properly and create several chunks. The text processing pipeline should extract this content and divide it into meaningful segments.
+
+Each paragraph should become a separate chunk or be combined intelligently based on the chunking algorithm. This will test if our fixes work correctly.
