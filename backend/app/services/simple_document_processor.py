@@ -65,9 +65,8 @@ class SimpleDocumentProcessor:
             
             if existing_doc:
                 logger.info(f"🔄 Found existing document {existing_doc.id} - replacing it with new version")
-                
+
                 # Delete existing chunks from SQL and vector store
-                from app.models.knowledge_base import KBChunk
                 existing_chunks_result = await db.execute(
                     select(KBChunk).where(KBChunk.document_id == existing_doc.id)
                 )

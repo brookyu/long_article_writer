@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Search, FileText, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,10 +11,14 @@ interface DocumentSearchProps {
 }
 
 interface SearchResult {
+  milvus_id: string
+  chunk_id: number
   document_id: number
-  filename: string
-  relevance_score: number
-  preview: string
+  chunk_index: number
+  text: string
+  char_count: number
+  score: number
+  metadata: any
 }
 
 export function DocumentSearch({ collectionId }: DocumentSearchProps) {
@@ -22,17 +26,39 @@ export function DocumentSearch({ collectionId }: DocumentSearchProps) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [documentNames, setDocumentNames] = useState<Record<number, string>>({})
+
+  // Fetch document names when component mounts
+  useEffect(() => {
+    const fetchDocumentNames = async () => {
+      try {
+        const response = await documentsApi.list(collectionId)
+        const nameMap: Record<number, string> = {}
+        response.documents.forEach((doc: any) => {
+          nameMap[doc.id] = doc.original_filename || `Document ${doc.id}`
+        })
+        setDocumentNames(nameMap)
+      } catch (error) {
+        console.error('Failed to fetch document names:', error)
+      }
+    }
+    fetchDocumentNames()
+  }, [collectionId])
 
   const handleSearch = async () => {
     if (!query.trim()) return
 
     try {
       setLoading(true)
+      console.log('Searching for:', query.trim(), 'in collection:', collectionId)
       const response = await documentsApi.search(collectionId, query.trim())
-      setResults(response.matches || [])
+      console.log('Search response:', response) // Debug log
+      console.log('Results array:', response.results)
+      setResults(response.results || [])
       setHasSearched(true)
     } catch (error) {
       console.error('Search failed:', error)
+      console.error('Error details:', error)
       setResults([])
     } finally {
       setLoading(false)
@@ -107,14 +133,16 @@ export function DocumentSearch({ collectionId }: DocumentSearchProps) {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <FileText className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{result.filename}</span>
+                            <span className="font-medium">
+                              {documentNames[result.document_id] || `Document ${result.document_id}`}
+                            </span>
                             <Badge variant="outline" className="text-xs">
                               <Sparkles className="h-3 w-3 mr-1" />
-                              {Math.round(result.relevance_score * 100)}% match
+                              {Math.round(result.score * 100)}% match
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {result.preview}
+                          <p className="text-sm text-muted-foreground line-clamp-3">
+                            {result.text}
                           </p>
                         </div>
                       </div>

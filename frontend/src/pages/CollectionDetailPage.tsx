@@ -3,9 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Database, Plus, PenTool } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DocumentUpload } from '@/components/documents/DocumentUpload'
-import { FolderUpload } from '@/components/documents/FolderUpload'
-import { EnhancedFolderUpload } from '@/components/documents/EnhancedFolderUpload'
+import { StreamingDocumentUpload } from '@/components/documents/StreamingDocumentUpload'
 import { DocumentList } from '@/components/documents/DocumentList'
 import { DocumentSearch } from '@/components/documents/DocumentSearch'
 import { FolderTree } from '@/components/folders/FolderTree'
@@ -23,9 +21,19 @@ export function CollectionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showUpload, setShowUpload] = useState(false)
-  const [uploadMode, setUploadMode] = useState<'individual' | 'folder' | 'enhanced'>('enhanced')
+
   const [viewMode, setViewMode] = useState<'documents' | 'folders' | 'browser'>('documents')
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // Debug component renders
+  useEffect(() => {
+    console.log('🏠 CollectionDetailPage rendered, refreshKey:', refreshKey, 'showUpload:', showUpload)
+  })
+
+  // Debug component renders
+  useEffect(() => {
+    console.log('🏠 CollectionDetailPage rendered, refreshKey:', refreshKey, 'showUpload:', showUpload)
+  })
 
   const loadCollection = async () => {
     try {
@@ -46,10 +54,15 @@ export function CollectionDetailPage() {
     }
   }, [collectionId])
 
-  const handleUploadComplete = (document: Document) => {
-    setRefreshKey(prev => prev + 1)
+  const handleUploadComplete = (successCount: number, totalCount: number) => {
+    console.log('🏠 handleUploadComplete called, about to increment refreshKey from', refreshKey)
+    setRefreshKey(prev => {
+      console.log('🏠 refreshKey changing from', prev, 'to', prev + 1)
+      return prev + 1
+    })
     // Refresh collection stats
     loadCollection()
+    console.log(`Upload completed: ${successCount}/${totalCount} files processed successfully`)
   }
 
   const handleUploadError = (error: string) => {
@@ -124,7 +137,7 @@ export function CollectionDetailPage() {
           </Button>
           <Button onClick={() => setShowUpload(!showUpload)} variant="outline">
             <Plus className="h-4 w-4 mr-2" />
-            Upload Documents
+            Upload Documents & Folders
           </Button>
         </div>
       </div>
@@ -163,62 +176,13 @@ export function CollectionDetailPage() {
 
       {/* Document Upload */}
       {showUpload && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Upload Documents</CardTitle>
-                <CardDescription>
-                  Add documents to this collection for AI-powered analysis
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={uploadMode === 'enhanced' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setUploadMode('enhanced')}
-                >
-                  Enhanced Upload
-                </Button>
-                <Button
-                  variant={uploadMode === 'folder' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setUploadMode('folder')}
-                >
-                  Simple Folder
-                </Button>
-                <Button
-                  variant={uploadMode === 'individual' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setUploadMode('individual')}
-                >
-                  Individual Files
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {uploadMode === 'enhanced' ? (
-              <EnhancedFolderUpload
-                collectionId={collectionId}
-                onUploadComplete={handleUploadComplete}
-                onUploadError={handleUploadError}
-              />
-            ) : uploadMode === 'folder' ? (
-              <FolderUpload
-                collectionId={collectionId}
-                onUploadComplete={handleUploadComplete}
-                onUploadError={handleUploadError}
-              />
-            ) : (
-              <DocumentUpload
-                collectionId={collectionId}
-                onUploadComplete={handleUploadComplete}
-                onUploadError={handleUploadError}
-              />
-            )}
-          </CardContent>
-        </Card>
+        <StreamingDocumentUpload
+          key={`upload-${collectionId}`} // Stable key to prevent recreation
+          collectionId={collectionId}
+          onUploadComplete={handleUploadComplete}
+          onUploadError={handleUploadError}
+          onClose={() => setShowUpload(false)}
+        />
       )}
 
       {/* View Mode Selector */}

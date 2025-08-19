@@ -245,7 +245,7 @@ class DocumentProcessingPipeline:
         collection_id: int,
         query_text: str,
         limit: int = 10,
-        score_threshold: float = 0.7,
+        score_threshold: float = 0.2,  # Lower threshold for better recall
         embedding_model: Optional[str] = None,
         db: Optional[AsyncSession] = None
     ) -> Dict[str, Any]:

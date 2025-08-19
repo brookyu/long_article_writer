@@ -182,11 +182,11 @@ class MilvusVectorStore:
             raise VectorStoreError(f"Embedding storage failed: {e}")
     
     async def search_similar(
-        self, 
+        self,
         kb_collection_id: int,
         query_embedding: List[float],
         limit: int = 10,
-        score_threshold: float = 0.7
+        score_threshold: float = 0.2  # Lower threshold for better recall
     ) -> List[Dict[str, Any]]:
         """
         Search for similar embeddings

@@ -160,7 +160,8 @@ class UploadManager:
     
     async def _process_job_async(self, job_id: str, original_db: AsyncSession):
         """Process job asynchronously with its own database session"""
-        
+
+        logger.info(f"🚀 Starting background processing for job {job_id}")
         from app.core.database import get_db
         
         # Create a new database session for this async task
@@ -174,6 +175,10 @@ class UploadManager:
                 
                 if not job:
                     raise ValueError(f"Job {job_id} not found")
+
+                logger.info(f"📋 Job details - Type: {job.upload_type}, File list: {job.file_list}")
+                if job.file_list:
+                    logger.info(f"📋 File list has {len(job.file_list)} files: {job.file_list}")
                 
                 # Determine processing path based on upload type
                 if job.upload_path:
@@ -211,11 +216,17 @@ class UploadManager:
                         "file_types": {},
                         "errors": []
                     }
-                    
+
+                    # Track temp directory for cleanup
+                    temp_dir_to_cleanup = None
+
                     for file_path in job.file_list:
                         path = Path(file_path)
+                        logger.info(f"🔍 Checking file existence: {file_path}")
+                        logger.info(f"🔍 Path exists: {path.exists()}")
                         if path.exists():
                             file_size = path.stat().st_size
+                            logger.info(f"✅ File found: {file_path} ({file_size} bytes)")
                             files.append(
                                 FileInfo(
                                     path=path,
@@ -224,6 +235,19 @@ class UploadManager:
                                 )
                             )
                             folder_structure["total_size"] += file_size
+
+                            # Track the temp directory for cleanup (all files should be in same temp dir)
+                            if temp_dir_to_cleanup is None and "batch_uploads" in str(path):
+                                temp_dir_to_cleanup = path.parent
+                                logger.info(f"📁 Temp directory to cleanup: {temp_dir_to_cleanup}")
+                        else:
+                            logger.error(f"❌ File not found during processing: {file_path}")
+                            # Check if parent directory exists
+                            parent_dir = path.parent
+                            logger.error(f"❌ Parent directory exists: {parent_dir.exists()}")
+                            if parent_dir.exists():
+                                logger.error(f"❌ Files in parent directory: {list(parent_dir.iterdir())}")
+                            folder_structure["errors"].append(f"File not found: {file_path}")
                 
                 else:
                     raise ValueError("No upload path or file list specified")
@@ -267,6 +291,14 @@ class UploadManager:
                 
                 logger.info(f"Completed job {job_id}: {len(results['successful'])} successful, "
                            f"{len(results['failed'])} failed")
+
+                # Cleanup temp directory if it was used for multiple files
+                if 'temp_dir_to_cleanup' in locals() and temp_dir_to_cleanup and temp_dir_to_cleanup.exists():
+                    try:
+                        shutil.rmtree(temp_dir_to_cleanup)
+                        logger.info(f"Cleaned up temp directory: {temp_dir_to_cleanup}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to cleanup temp directory {temp_dir_to_cleanup}: {cleanup_error}")
                 
             except Exception as e:
                 logger.error(f"Job {job_id} failed: {e}")
@@ -285,6 +317,14 @@ class UploadManager:
                     await db.commit()
                 except Exception as commit_error:
                     logger.error(f"Failed to update job status: {commit_error}")
+
+                # Cleanup temp directory on error as well
+                if 'temp_dir_to_cleanup' in locals() and temp_dir_to_cleanup and temp_dir_to_cleanup.exists():
+                    try:
+                        shutil.rmtree(temp_dir_to_cleanup)
+                        logger.info(f"Cleaned up temp directory after error: {temp_dir_to_cleanup}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to cleanup temp directory after error {temp_dir_to_cleanup}: {cleanup_error}")
             
             finally:
                 # Remove from active jobs

@@ -10,7 +10,7 @@ import asyncio
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 
 from app.core.database import get_db
 from app.models.knowledge_base import KBCollection, KBDocument, Article, ArticleStatus
@@ -27,6 +27,7 @@ from app.services.ollama_client import OllamaClient
 from app.services.document_processor import DocumentProcessingPipeline
 from app.models.settings import Setting
 from datetime import datetime
+from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -34,6 +35,11 @@ router = APIRouter()
 # Temporary in-memory storage for generated articles
 # In a real implementation, this would be stored in the database
 generated_articles = {}
+
+
+class SearchRequest(BaseModel):
+    """Request model for document search"""
+    query: str
 
 
 async def _start_job_processing(job_id: str):
@@ -696,6 +702,160 @@ async def get_document_processing_status(
         "last_updated": document.updated_at.isoformat(),
         "progress": 100 if document.status.value == "completed" else 0
     }
+
+
+@router.post("/{collection_id}/search/", response_model=dict)
+async def search_documents(
+    collection_id: int,
+    search_request: SearchRequest,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Search for documents in a collection using semantic search"""
+
+    # Verify collection exists
+    result = await db.execute(
+        select(KBCollection).where(KBCollection.id == collection_id)
+    )
+    collection = result.scalar_one_or_none()
+
+    if not collection:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Collection with id {collection_id} not found"
+        )
+
+    try:
+        # Initialize document processor
+        doc_processor = DocumentProcessingPipeline()
+
+        # Perform semantic search
+        search_results = await doc_processor.search_similar_content(
+            collection_id=collection_id,
+            query_text=search_request.query,
+            limit=limit,
+            db=db
+        )
+
+        # Extract results from the search response
+        results = search_results.get('matches', [])
+
+        logger.info(f"Search completed for collection {collection_id}, query: '{search_request.query}', found {len(results)} results")
+
+        return {
+            "query": search_request.query,
+            "collection_id": collection_id,
+            "total_results": len(results),
+            "results": results,
+            "search_metadata": {
+                "embedding_model": search_results.get('embedding_model'),
+                "search_time_ms": search_results.get('search_time_ms', 0)
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Search failed for collection {collection_id}: {e}")
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}"
+        )
+
+
+@router.post("/{collection_id}/reprocess-documents", response_model=dict)
+async def reprocess_collection_documents(
+    collection_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Reprocess all documents in a collection to fix missing embeddings"""
+
+    # Verify collection exists
+    result = await db.execute(
+        select(KBCollection).where(KBCollection.id == collection_id)
+    )
+    collection = result.scalar_one_or_none()
+
+    if not collection:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Collection with id {collection_id} not found"
+        )
+
+    # Get all documents in the collection
+    docs_result = await db.execute(
+        select(KBDocument).where(KBDocument.collection_id == collection_id)
+    )
+    documents = docs_result.scalars().all()
+
+    if not documents:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"No documents found in collection {collection_id}"
+        )
+
+    try:
+        # Initialize document processor
+        doc_processor = DocumentProcessingPipeline()
+
+        # Reprocess each document
+        reprocessed_count = 0
+        for document in documents:
+            try:
+                logger.info(f"Reprocessing document {document.id}: {document.original_filename}")
+                await doc_processor.reprocess_document(
+                    document_id=document.id,
+                    collection_id=collection_id,
+                    file_path=document.file_path,
+                    mime_type=document.mime_type
+                )
+                reprocessed_count += 1
+            except Exception as e:
+                logger.error(f"Failed to reprocess document {document.id}: {e}")
+
+        # Update collection counters
+        await _update_collection_counters(collection_id, db)
+
+        logger.info(f"Reprocessed {reprocessed_count}/{len(documents)} documents in collection {collection_id}")
+
+        return {
+            "message": f"Reprocessing initiated for collection {collection_id}",
+            "collection_id": collection_id,
+            "total_documents": len(documents),
+            "reprocessed_count": reprocessed_count
+        }
+
+    except Exception as e:
+        logger.error(f"Reprocessing failed for collection {collection_id}: {e}")
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail=f"Reprocessing failed: {str(e)}"
+        )
+
+
+async def _update_collection_counters(collection_id: int, db: AsyncSession):
+    """Update collection document and chunk counters"""
+    # Count documents
+    docs_count_result = await db.execute(
+        select(func.count(KBDocument.id)).where(KBDocument.collection_id == collection_id)
+    )
+    total_documents = docs_count_result.scalar() or 0
+
+    # Count chunks
+    chunks_count_result = await db.execute(
+        select(func.sum(KBDocument.chunk_count)).where(KBDocument.collection_id == collection_id)
+    )
+    total_chunks = chunks_count_result.scalar() or 0
+
+    # Update collection
+    await db.execute(
+        update(KBCollection).where(KBCollection.id == collection_id).values(
+            total_documents=total_documents,
+            total_chunks=total_chunks
+        )
+    )
+    await db.commit()
+
+    logger.info(f"Updated collection {collection_id} counters: {total_documents} docs, {total_chunks} chunks")
 
 
 @router.post("/{collection_id}/generate-article")

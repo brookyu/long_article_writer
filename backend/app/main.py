@@ -102,6 +102,7 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Global exception handler with logging"""
+    print(f"🚨 GLOBAL EXCEPTION HANDLER: {request.method} {request.url.path} - {str(exc)}")
     logger.error(
         "Unhandled exception",
         path=request.url.path,

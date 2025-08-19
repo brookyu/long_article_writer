@@ -111,16 +111,32 @@ async def upload_documents_stream(
     Real-time progress updates for file uploads!
     Perfect for your 70-file upload with live progress bars.
     """
+    # Add debugging at the very start
+    print(f"🚀 UPLOAD-STREAM: Function called! collection_id={collection_id}")
+    logger.info(f"🚀 UPLOAD-STREAM: Function called! collection_id={collection_id}")
+
+    try:
+        print(f"🚀 UPLOAD-STREAM: Files received: {len(files)} files")
+        logger.info(f"🚀 UPLOAD-STREAM: Files received: {len(files)} files")
+        for i, file in enumerate(files):
+            print(f"🔍 UPLOAD-STREAM: File {i}: {file.filename} ({file.content_type})")
+            logger.info(f"🔍 UPLOAD-STREAM: File {i}: {file.filename} ({file.content_type})")
+    except Exception as e:
+        print(f"❌ UPLOAD-STREAM: Error processing files: {e}")
+        logger.error(f"❌ UPLOAD-STREAM: Error processing files: {e}")
+        raise HTTPException(status_code=400, detail=f"Error processing files: {str(e)}")
     
     async def stream_upload_progress():
         try:
+            logger.info(f"🔍 UPLOAD-STREAM: stream_upload_progress started for collection {collection_id}")
             # Verify collection exists
             collection = await db.execute(
                 select(KBCollection).where(KBCollection.id == collection_id)
             )
             collection = collection.scalar_one_or_none()
-            
+
             if not collection:
+                logger.error(f"❌ UPLOAD-STREAM: Collection {collection_id} not found")
                 yield f'data: {json.dumps({"type": "error", "message": "Collection not found"})}\n\n'
                 return
             
@@ -141,10 +157,16 @@ async def upload_documents_stream(
                     yield f'data: {json.dumps({"type": "file_start", "filename": upload_file.filename, "file_index": i, "total_files": total_files})}\n\n'
                     
                     # Save uploaded file temporarily
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{upload_file.filename}") as temp_file:
+                    # Use a simple suffix to avoid issues with special characters in filenames
+                    file_extension = Path(upload_file.filename).suffix
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
                         content = await upload_file.read()
                         temp_file.write(content)
                         temp_file_path = Path(temp_file.name)
+
+                    logger.info(f"📁 UPLOAD-STREAM: Saved {upload_file.filename} to {temp_file_path}")
+                    logger.info(f"📁 UPLOAD-STREAM: File exists: {temp_file_path.exists()}")
+                    logger.info(f"📁 UPLOAD-STREAM: File size: {temp_file_path.stat().st_size if temp_file_path.exists() else 'N/A'}")
                     
                     # Determine MIME type
                     mime_type, _ = mimetypes.guess_type(upload_file.filename)
@@ -182,15 +204,19 @@ async def upload_documents_stream(
                     logger.error(f"Failed to process {upload_file.filename}: {e}")
                     failed_count += 1
                     processed_count += 1
-                    
+
+                    # Cleanup temp file if it exists
+                    if 'temp_file_path' in locals():
+                        temp_file_path.unlink(missing_ok=True)
+
                     results.append({
                         "success": False,
                         "error": str(e),
                         "filename": upload_file.filename
                     })
-                    
+
                     yield f'data: {json.dumps({"type": "file_failed", "filename": upload_file.filename, "file_index": i, "error": str(e)})}\n\n'
-                    
+
                     # Send progress update even for failed files
                     progress_percentage = (processed_count / total_files) * 100
                     yield f'data: {json.dumps({"type": "progress", "processed": processed_count, "successful": successful_count, "failed": failed_count, "total": total_files, "percentage": progress_percentage})}\n\n'
@@ -209,6 +235,7 @@ async def upload_documents_stream(
             logger.error(f"Streaming upload failed: {e}")
             yield f'data: {json.dumps({"type": "error", "message": f"Upload failed: {str(e)}"})}\n\n'
     
+    logger.info(f"🔄 UPLOAD-STREAM: Returning StreamingResponse for collection {collection_id}")
     return StreamingResponse(
         stream_upload_progress(),
         media_type="text/event-stream",
@@ -306,12 +333,13 @@ async def upload_folder_stream(
     
     async def stream_folder_upload():
         try:
+            logger.info(f"🚀 UPLOAD-STREAM: Starting folder upload for collection {collection_id}")
             # Verify collection exists
             collection = await db.execute(
                 select(KBCollection).where(KBCollection.id == collection_id)
             )
             collection = collection.scalar_one_or_none()
-            
+
             if not collection:
                 yield f'data: {json.dumps({"type": "error", "message": "Collection not found"})}\n\n'
                 return
@@ -329,61 +357,111 @@ async def upload_folder_stream(
                     f.write(content)
                 
                 # Extract files with proper encoding for Chinese filenames
+                extracted_files = []
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    # Extract files one by one with proper filename handling
-                    for member in zip_ref.infolist():
-                        if member.is_dir():
-                            continue
-                            
-                        # Get the original filename as bytes and try different encodings
-                        original_filename = member.filename
+                    logger.info(f"🗂️ ZIP contains {len(zip_ref.infolist())} items")
+                    
+                    # First, let's use the default extractall and see what we get
+                    try:
+                        zip_ref.extractall(temp_dir_path)
+                        logger.info("✅ Default extraction completed successfully")
+                    except Exception as e:
+                        logger.error(f"❌ Default extraction failed: {e}")
                         
-                        try:
-                            # Try different encoding approaches for Chinese filenames
-                            if original_filename.encode('utf-8', errors='ignore') != original_filename.encode('latin1', errors='ignore'):
-                                # Filename likely has encoding issues
-                                try:
-                                    # Try GBK decoding first (common for Chinese Windows)
-                                    decoded_name = original_filename.encode('cp437').decode('gbk')
-                                except (UnicodeDecodeError, UnicodeEncodeError):
-                                    try:
-                                        # Try UTF-8 decoding
-                                        decoded_name = original_filename.encode('cp437').decode('utf-8')
-                                    except (UnicodeDecodeError, UnicodeEncodeError):
-                                        # Use original if all fail
-                                        decoded_name = original_filename
-                            else:
-                                decoded_name = original_filename
+                        # Fall back to manual extraction with encoding handling
+                        for member in zip_ref.infolist():
+                            if member.is_dir():
+                                continue
+                                
+                            original_filename = member.filename
+                            logger.info(f"📁 Processing ZIP member: {original_filename}")
                             
-                            # Extract with corrected filename
-                            member.filename = decoded_name
-                            zip_ref.extract(member, temp_dir_path)
-                            
-                        except Exception as e:
-                            logger.warning(f"Failed to extract {original_filename}: {e}")
-                            # Try extracting with original filename as fallback
                             try:
-                                member.filename = original_filename
-                                zip_ref.extract(member, temp_dir_path)
-                            except Exception as e2:
-                                logger.error(f"Failed to extract {original_filename} with original name: {e2}")
+                                # Try multiple encoding approaches
+                                decoded_names = [
+                                    original_filename,  # Try as-is first
+                                ]
+                                
+                                # Try different encodings for Chinese characters
+                                try:
+                                    decoded_names.append(original_filename.encode('cp437').decode('gbk'))
+                                except:
+                                    pass
+                                    
+                                try:
+                                    decoded_names.append(original_filename.encode('cp437').decode('utf-8'))
+                                except:
+                                    pass
+                                    
+                                try:
+                                    decoded_names.append(original_filename.encode('latin1').decode('utf-8'))
+                                except:
+                                    pass
+                                
+                                # Try each decoded name
+                                extracted = False
+                                for decoded_name in decoded_names:
+                                    try:
+                                        # Create a new member with the decoded filename
+                                        new_member = zipfile.ZipInfo(decoded_name)
+                                        new_member.external_attr = member.external_attr
+                                        new_member.compress_type = member.compress_type
+                                        new_member.create_system = member.create_system
+                                        new_member.create_version = member.create_version
+                                        new_member.date_time = member.date_time
+                                        new_member.extract_version = member.extract_version
+                                        new_member.file_size = member.file_size
+                                        new_member.compress_size = member.compress_size
+                                        new_member.CRC = member.CRC
+                                        
+                                        # Extract using the original member data but with new filename
+                                        with zip_ref.open(member) as source:
+                                            target_path = temp_dir_path / decoded_name
+                                            target_path.parent.mkdir(parents=True, exist_ok=True)
+                                            with open(target_path, 'wb') as target:
+                                                target.write(source.read())
+                                        
+                                        logger.info(f"✅ Successfully extracted as: {decoded_name}")
+                                        extracted_files.append(target_path)
+                                        extracted = True
+                                        break
+                                        
+                                    except Exception as decode_error:
+                                        logger.debug(f"Failed to extract with name '{decoded_name}': {decode_error}")
+                                        continue
+                                
+                                if not extracted:
+                                    logger.error(f"❌ Failed to extract {original_filename} with any encoding")
+                                    
+                            except Exception as e:
+                                logger.error(f"❌ Failed to process member {original_filename}: {e}")
                                 continue
                 
                 # Find all supported files
                 supported_extensions = {'.txt', '.md', '.pdf', '.docx', '.doc', '.html', '.csv'}
                 file_paths = []
                 
-                # Debug: List all extracted files
-                logger.info(f"Listing all extracted files:")
+                # Debug: List all extracted files with full paths
+                logger.info(f"🔍 Scanning extracted directory: {temp_dir_path}")
                 all_files = list(temp_dir_path.rglob('*'))
+                logger.info(f"📂 Found {len(all_files)} total items in extraction directory")
+                
                 for file_path in all_files:
                     if file_path.is_file():
-                        logger.info(f"  Extracted file: {file_path.name} (extension: {file_path.suffix.lower()})")
+                        relative_path = file_path.relative_to(temp_dir_path)
+                        logger.info(f"📄 Found file: {relative_path} (size: {file_path.stat().st_size} bytes, ext: {file_path.suffix.lower()})")
+                        
                         if file_path.suffix.lower() in supported_extensions:
                             file_paths.append(file_path)
-                            logger.info(f"    → Added to processing queue")
+                            logger.info(f"    ✅ Added to processing queue")
+                        else:
+                            logger.info(f"    ⏭️ Skipped (unsupported extension)")
+                    else:
+                        logger.debug(f"📁 Directory: {file_path.relative_to(temp_dir_path)}")
                 
-                logger.info(f"Total supported files found: {len(file_paths)}")
+                logger.info(f"🎯 Total supported files found: {len(file_paths)}")
+                for i, fp in enumerate(file_paths, 1):
+                    logger.info(f"  {i}. {fp.relative_to(temp_dir_path)} ({fp.suffix.lower()})")
                 
                 if not file_paths:
                     yield f'data: {json.dumps({"type": "complete", "message": "No supported files found in ZIP", "summary": {"total": 0, "successful": 0, "failed": 0, "skipped": 0}})}\n\n'
@@ -408,7 +486,9 @@ async def upload_folder_stream(
                         mime_type, _ = mimetypes.guess_type(file_path.name)
                         
                         # Process the document
-                        logger.info(f"Processing file: {file_path.name} (mime_type: {mime_type})")
+                        logger.info(f"🔍 UPLOAD-STREAM: Processing file: {file_path.name} (mime_type: {mime_type})")
+                        logger.info(f"🔍 UPLOAD-STREAM: File path exists: {file_path.exists()}")
+                        logger.info(f"🔍 UPLOAD-STREAM: Full file path: {file_path}")
                         result = await processor.process_document(
                             file_path=file_path,
                             collection_id=collection_id,
@@ -416,7 +496,7 @@ async def upload_folder_stream(
                             original_filename=file_path.name,
                             mime_type=mime_type
                         )
-                        logger.info(f"Process result for {file_path.name}: {result}")
+                        logger.info(f"🔍 UPLOAD-STREAM: Process result for {file_path.name}: {result}")
                         
                         results.append(result)
                         processed_count += 1

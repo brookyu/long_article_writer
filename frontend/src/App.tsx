@@ -55,12 +55,7 @@ function AppContent() {
               >
                 {t('navigation.settings')}
               </Link>
-              <Link 
-                to="/test-upload" 
-                className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
-              >
-                🚀 Test Upload
-              </Link>
+
               <Link 
                 to="/" 
                 className="text-muted-foreground hover:text-foreground transition-colors"

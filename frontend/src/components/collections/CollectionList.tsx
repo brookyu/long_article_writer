@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Edit, Trash2, Database, FileText, Clock, ExternalLink, MessageSquare } from 'lucide-react'
+import { Plus, Edit, Trash2, Database, FileText, Clock, ExternalLink, MessageSquare, Upload } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { collectionsApi } from '@/lib/api'
 import { Collection } from '@/types/collections'
 import { formatDistanceToNow } from 'date-fns'
+import { StreamingDocumentUpload } from '@/components/documents/StreamingDocumentUpload'
 
 interface CollectionListProps {
   onCreateNew: () => void
@@ -20,6 +21,7 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
   const [collections, setCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [uploadingToCollection, setUploadingToCollection] = useState<number | null>(null)
 
   const loadCollections = async () => {
     try {
@@ -37,6 +39,15 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
   useEffect(() => {
     loadCollections()
   }, [])
+
+  const handleUploadComplete = (successCount: number, totalCount: number) => {
+    loadCollections() // Refresh collections to show updated stats
+    console.log(`Upload completed: ${successCount}/${totalCount} files processed successfully`)
+  }
+
+  const handleUploadError = (error: string) => {
+    console.error('Upload error:', error)
+  }
 
   if (loading) {
     return (
@@ -154,6 +165,14 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUploadingToCollection(collection.id)}
+                      title="Quick Upload Documents & Folders"
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
                     <Link to={`/chat/${collection.id}`}>
                       <Button variant="outline" size="sm" title="AI Article Writer">
                         <MessageSquare className="h-4 w-4 mr-1" />
@@ -220,6 +239,20 @@ export function CollectionList({ onCreateNew, onEdit, onDelete }: CollectionList
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Upload Modal */}
+      {uploadingToCollection && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <StreamingDocumentUpload
+              collectionId={uploadingToCollection}
+              onUploadComplete={handleUploadComplete}
+              onUploadError={handleUploadError}
+              onClose={() => setUploadingToCollection(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
